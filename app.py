@@ -20,7 +20,6 @@ def get_buses():
 
 @app.route('/api/routes')
 def get_routes():
-    # Ovaj file sadrži sve stanice i putanje
     url = "https://www.bus-split.com/api/routes.json"
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     try:
