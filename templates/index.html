@@ -7,61 +7,60 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 100vh; width: 100%; }
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; padding: 0; font-family: sans-serif; }
 
-        /* --- STIL ZA TRAŽILICU --- */
-        #search-box {
+        /* Stil za tražilicu i listu rezultata */
+        #search-container {
             position: absolute;
             top: 15px;
-            left: 55px; /* Da ne prekrije gumbe za zoom */
+            left: 55px;
             z-index: 1000;
-            background: white;
-            padding: 8px;
-            border-radius: 20px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            display: flex;
-            align-items: center;
+            width: 200px;
         }
         #bus-search {
-            border: none;
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             outline: none;
-            padding: 5px 10px;
-            width: 180px;
+        }
+        #results-list {
+            background: white;
+            border-radius: 8px;
+            margin-top: 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            display: none; /* Sakriveno dok ne počneš tipkati */
+        }
+        .result-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
             font-size: 14px;
         }
+        .result-item:hover { background: #f0f0f0; }
 
-        /* --- STIL ZA NALJEPNICU AUTOBUSA (IKONA) --- */
+        /* Stil za ikonu autobusa */
         .bus-badge {
-            background: #ffcc00; /* Prepoznatljiva žuta boja */
+            background: #ffcc00;
             border: 2px solid #333;
             border-radius: 6px;
             color: black;
             font-weight: bold;
             text-align: center;
             box-shadow: 2px 2px 6px rgba(0,0,0,0.4);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            overflow: hidden;
         }
-        .line-text {
-            font-size: 14px;
-            line-height: 1.1;
-            padding-top: 2px;
-        }
-        .garage-text {
-            font-size: 9px;
-            background: rgba(0,0,0,0.05);
-            margin-top: 1px;
-            padding-bottom: 1px;
-            color: #444;
-        }
+        .line-text { font-size: 14px; display: block; border-bottom: 1px solid #333; }
+        .garage-text { font-size: 9px; display: block; }
     </style>
 </head>
 <body>
 
-    <div id="search-box">
-        <input type="text" id="bus-search" placeholder="Traži liniju (npr. 37)...">
+    <div id="search-container">
+        <input type="text" id="bus-search" placeholder="Upiši liniju (npr. 37)..." autocomplete="off">
+        <div id="results-list"></div>
     </div>
 
     <div id="map"></div>
@@ -69,9 +68,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = L.map('map').setView([43.5147, 16.4435], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         var markers = {};
         var allBuses = [];
@@ -81,67 +78,59 @@
                 .then(res => res.json())
                 .then(data => {
                     allBuses = data.vehicles || [];
-                    
                     allBuses.forEach(bus => {
-                        var lat = bus.latitude;
-                        var lon = bus.longitude;
-                        
-                        if (lat && lon) {
-                            var linija = bus.name || "?";
-                            var garazni = bus.garageNumber || "";
-                            var reg = bus.registrationNumber || "";
-
-                            // Kreiramo HTML za našu novu ikonu
-                            var iconHtml = '<div class="bus-badge">' +
-                                           '<span class="line-text">' + linija + '</span>' +
-                                           '<span class="garage-text">' + garazni + '</span>' +
-                                           '</div>';
-
-                            var customIcon = L.divIcon({
-                                html: iconHtml,
-                                className: '', // Resetiramo defaultne stilove
-                                iconSize: [42, 36],
-                                iconAnchor: [21, 18]
-                            });
-
-                            var popupContent = "<b>Linija:</b> " + linija + "<br>" +
-                                               "<b>Garažni broj:</b> " + garazni + "<br>" +
-                                               "<b>Registracija:</b> " + reg;
+                        if (bus.latitude && bus.longitude) {
+                            var iconHtml = '<div class="bus-badge"><span class="line-text">'+bus.name+'</span><span class="garage-text">'+bus.garageNumber+'</span></div>';
+                            var customIcon = L.divIcon({ html: iconHtml, className: '', iconSize: [42, 36], iconAnchor: [21, 18] });
+                            var popupText = "<b>Linija:</b> "+bus.name+"<br><b>Garažni:</b> "+bus.garageNumber+"<br><b>Reg:</b> "+bus.registrationNumber;
 
                             if (markers[bus.id]) {
-                                markers[bus.id].setLatLng([lat, lon]);
-                                markers[bus.id].setIcon(customIcon);
-                                markers[bus.id].getPopup().setContent(popupContent);
+                                markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
                             } else {
-                                markers[bus.id] = L.marker([lat, lon], {icon: customIcon})
-                                    .addTo(map)
-                                    .bindPopup(popupContent);
+                                markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: customIcon}).addTo(map).bindPopup(popupText);
                             }
                         }
                     });
                 });
         }
 
-        // --- LOGIKA TRAŽILICE ---
-        document.getElementById('bus-search').addEventListener('input', function(e) {
-            var searchVal = e.target.value.trim().toLowerCase();
-            if (searchVal === "") return;
+        // --- NOVA LOGIKA TRAŽILICE ---
+        var searchInput = document.getElementById('bus-search');
+        var resultsList = document.getElementById('results-list');
 
-            // Tražimo bus koji odgovara upisanoj liniji
-            var found = allBuses.find(b => b.name && b.name.toLowerCase() === searchVal);
-            
-            // Ako ne nađemo točno, tražimo bilo koji koji sadrži taj broj
-            if (!found) {
-                found = allBuses.find(b => b.name && b.name.toLowerCase().includes(searchVal));
+        searchInput.addEventListener('input', function() {
+            var val = this.value.trim().toLowerCase();
+            resultsList.innerHTML = ''; // Očisti stare rezultate
+
+            if (!val) {
+                resultsList.style.display = 'none';
+                return;
             }
 
-            if (found && markers[found.id]) {
-                map.setView([found.latitude, found.longitude], 16);
-                markers[found.id].openPopup();
+            // Filtriraj sve autobuse koji odgovaraju broju linije
+            var matches = allBuses.filter(b => b.name && b.name.toLowerCase().includes(val));
+
+            if (matches.length > 0) {
+                resultsList.style.display = 'block';
+                matches.forEach(bus => {
+                    var div = document.createElement('div');
+                    div.className = 'result-item';
+                    div.innerHTML = 'Linija <b>' + bus.name + '</b> (Garažni: ' + bus.garageNumber + ')';
+                    
+                    // Na klik, teleportiraj se na TAJ bus
+                    div.onclick = function() {
+                        map.setView([bus.latitude, bus.longitude], 16);
+                        markers[bus.id].openPopup();
+                        resultsList.style.display = 'none';
+                        searchInput.value = '';
+                    };
+                    resultsList.appendChild(div);
+                });
+            } else {
+                resultsList.style.display = 'none';
             }
         });
 
-        // Osvježavanje svakih 5 sekundi
         setInterval(updateBuses, 5000);
         updateBuses();
     </script>
