@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Promet Split Live</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100vw; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([43.5147, 16.4435], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        var markers = {};
+
+        function updateBuses() {
+            fetch('/api/buses')
+                .then(res => res.json())
+                .then(data => {
+                    // API s bus-split obično vraća listu u 'vehicles' ili direktno
+                    let vehicles = data.vehicles || data; 
+                    
+                    vehicles.forEach(bus => {
+                        // Koristimo 'lon' ili 'lng' ovisno što API šalje
+                        let lat = bus.lat || bus.latitude;
+                        let lon = bus.lon || bus.lng || bus.longitude;
+                        let label = bus.line_name || bus.route_short_name || "Bus";
+
+                        if (lat && lon) {
+                            if (markers[bus.id]) {
+                                markers[bus.id].setLatLng([lat, lon]);
+                            } else {
+                                markers[bus.id] = L.marker([lat, lon])
+                                    .addTo(map)
+                                    .bindPopup("Linija: " + label);
+                            }
+                        }
+                    });
+                });
+        }
+
+        setInterval(updateBuses, 5000);
+        updateBuses();
+    </script>
+</body>
+</html>
