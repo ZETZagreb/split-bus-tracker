@@ -1,135 +1,63 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Promet Split Live</title>
+    <title>Split Bus Live</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 100vh; width: 100%; }
-        body { margin: 0; padding: 0; font-family: sans-serif; }
-
-        /* Stil za tražilicu i listu rezultata */
-        #search-container {
-            position: absolute;
-            top: 15px;
-            left: 55px;
-            z-index: 1000;
-            width: 200px;
-        }
-        #bus-search {
-            width: 100%;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            outline: none;
-        }
-        #results-list {
-            background: white;
-            border-radius: 8px;
-            margin-top: 5px;
-            max-height: 200px;
-            overflow-y: auto;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            display: none; /* Sakriveno dok ne počneš tipkati */
-        }
-        .result-item {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        .result-item:hover { background: #f0f0f0; }
-
-        /* Stil za ikonu autobusa */
+        body { margin: 0; padding: 0; }
         .bus-badge {
             background: #ffcc00;
-            border: 2px solid #333;
-            border-radius: 6px;
-            color: black;
+            border: 2px solid #000;
+            border-radius: 5px;
+            color: #000;
             font-weight: bold;
             text-align: center;
-            box-shadow: 2px 2px 6px rgba(0,0,0,0.4);
+            font-family: sans-serif;
         }
-        .line-text { font-size: 14px; display: block; border-bottom: 1px solid #333; }
-        .garage-text { font-size: 9px; display: block; }
     </style>
 </head>
 <body>
-
-    <div id="search-container">
-        <input type="text" id="bus-search" placeholder="Upiši liniju (npr. 37)..." autocomplete="off">
-        <div id="results-list"></div>
-    </div>
-
     <div id="map"></div>
-
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = L.map('map').setView([43.5147, 16.4435], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         var markers = {};
-        var allBuses = [];
 
         function updateBuses() {
+            console.log("Dohvaćam podatke...");
             fetch('/api/buses')
                 .then(res => res.json())
                 .then(data => {
-                    allBuses = data.vehicles || [];
-                    allBuses.forEach(bus => {
+                    console.log("Podaci primljeni:", data);
+                    var list = data.vehicles || [];
+                    
+                    list.forEach(bus => {
                         if (bus.latitude && bus.longitude) {
-                            var iconHtml = '<div class="bus-badge"><span class="line-text">'+bus.name+'</span><span class="garage-text">'+bus.garageNumber+'</span></div>';
-                            var customIcon = L.divIcon({ html: iconHtml, className: '', iconSize: [42, 36], iconAnchor: [21, 18] });
-                            var popupText = "<b>Linija:</b> "+bus.name+"<br><b>Garažni:</b> "+bus.garageNumber+"<br><b>Reg:</b> "+bus.registrationNumber;
+                            var pos = [bus.latitude, bus.longitude];
+                            var label = `<div class="bus-badge">${bus.name}<br><small>${bus.garageNumber}</small></div>`;
+                            
+                            var icon = L.divIcon({
+                                html: label,
+                                className: '',
+                                iconSize: [40, 35]
+                            });
 
                             if (markers[bus.id]) {
-                                markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
+                                markers[bus.id].setLatLng(pos);
                             } else {
-                                markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: customIcon}).addTo(map).bindPopup(popupText);
+                                markers[bus.id] = L.marker(pos, {icon: icon}).addTo(map);
+                                markers[bus.id].bindPopup("Registracija: " + bus.registrationNumber);
                             }
                         }
                     });
-                });
+                })
+                .catch(err => console.error("Greška:", err));
         }
-
-        // --- NOVA LOGIKA TRAŽILICE ---
-        var searchInput = document.getElementById('bus-search');
-        var resultsList = document.getElementById('results-list');
-
-        searchInput.addEventListener('input', function() {
-            var val = this.value.trim().toLowerCase();
-            resultsList.innerHTML = ''; // Očisti stare rezultate
-
-            if (!val) {
-                resultsList.style.display = 'none';
-                return;
-            }
-
-            // Filtriraj sve autobuse koji odgovaraju broju linije
-            var matches = allBuses.filter(b => b.name && b.name.toLowerCase().includes(val));
-
-            if (matches.length > 0) {
-                resultsList.style.display = 'block';
-                matches.forEach(bus => {
-                    var div = document.createElement('div');
-                    div.className = 'result-item';
-                    div.innerHTML = 'Linija <b>' + bus.name + '</b> (Garažni: ' + bus.garageNumber + ')';
-                    
-                    // Na klik, teleportiraj se na TAJ bus
-                    div.onclick = function() {
-                        map.setView([bus.latitude, bus.longitude], 16);
-                        markers[bus.id].openPopup();
-                        resultsList.style.display = 'none';
-                        searchInput.value = '';
-                    };
-                    resultsList.appendChild(div);
-                });
-            } else {
-                resultsList.style.display = 'none';
-            }
-        });
 
         setInterval(updateBuses, 5000);
         updateBuses();
