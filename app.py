@@ -10,22 +10,20 @@ def index():
 
 @app.route('/api/buses')
 def get_buses():
-    url = "https://www.bus-split.com/api/vehicles/live"
     try:
-        r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
+        r = requests.get("https://www.bus-split.com/api/vehicles/live", timeout=10)
         return jsonify(r.json())
     except:
         return jsonify({"vehicles": []})
 
 @app.route('/api/routes')
-def get_all_routes():
-    # Povlačimo njihovu glavnu datoteku s rutama koju smo vidjeli u F12
-    url = "https://www.bus-split.com/api/routes.json"
+def get_routes():
     try:
-        r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
+        # Ovo je file koji smo vidjeli u F12 Networku
+        r = requests.get("https://www.bus-split.com/api/routes.json", timeout=10)
         return jsonify(r.json())
     except:
-        return jsonify({})
+        return jsonify([])
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
