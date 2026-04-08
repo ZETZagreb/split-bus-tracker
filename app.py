@@ -1,17 +1,35 @@
-from flask import Flask, render_template
+import os
+from flask import Flask, render_template, jsonify
+import requests
 
 app = Flask(__name__)
 
-# Glavna ruta koja samo učitava tvoju mapu
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Ova ruta nam više ne treba za podatke jer ih JS vuče direktno,
-# ali je ostavljamo praznu da ne baca greške ako je negdje ostao stari link.
 @app.route('/api/buses')
 def get_buses():
-    return {"vehicles": []}
+    url = "https://www.bus-split.com/api/vehicles/live"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    try:
+        r = requests.get(url, headers=headers, timeout=10)
+        return jsonify(r.json())
+    except:
+        return jsonify({"vehicles": []})
+
+# NOVA RUTA: Dohvaća stanice za određenu liniju s bus-split.com
+@app.route('/api/stops/<line_id>')
+def get_stops(line_id):
+    # Pokušavamo dohvatiti detalje rute (ovo je standardni endpoint za bus-split)
+    url = f"https://www.bus-split.com/api/lines/{line_id}/stops"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    try:
+        r = requests.get(url, headers=headers, timeout=5)
+        return jsonify(r.json())
+    except:
+        return jsonify([])
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
