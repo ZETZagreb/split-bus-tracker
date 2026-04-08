@@ -1,24 +1,50 @@
-function updateBuses() {
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Promet Split Live</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map { height: 100vh; width: 100%; }
+        body { margin: 0; padding: 0; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([43.5147, 16.4435], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var markers = {};
+
+        function updateBuses() {
             fetch('/api/buses')
                 .then(res => res.json())
                 .then(data => {
                     data.forEach(bus => {
-                        // Izvlačimo podatke iz API-ja
                         let lat = bus.lat;
                         let lon = bus.lon;
                         
-                        // Detalji koje si tražio:
-                        let linija = bus.line_name || "Nije dostupno";
-                        let smjer = bus.destination || "Nepoznat smjer";
-                        let garazniBroj = bus.device_number || bus.id; // device_number je obično garažni broj
+                        // Ovdje izvlačimo točne podatke iz API-ja
+                        // Koristimo više mogućih naziva jer se API nekad mijenja
+                        let linija = bus.line_name || bus.line_number || "Nepoznato";
+                        let smjer = bus.destination || bus.direction || "Nepoznat smjer";
+                        let garazni = bus.device_number || bus.id || "---";
+
+                        let popupText = `
+                            <div style="font-size: 14px;">
+                                <b>Linija:</b> <span style="color: blue;">${linija}</span><br>
+                                <b>Smjer:</b> ${smjer}<br>
+                                <b>Garažni broj:</b> ${garazni}
+                            </div>
+                        `;
 
                         if (lat && lon) {
-                            let popupText = `
-                                <b>Linija:</b> ${linija}<br>
-                                <b>Smjer:</b> ${smjer}<br>
-                                <b>Garažni broj:</b> ${garazniBroj}
-                            `;
-
                             if (markers[bus.id]) {
                                 markers[bus.id].setLatLng([lat, lon]);
                                 markers[bus.id].getPopup().setContent(popupText);
@@ -29,5 +55,12 @@ function updateBuses() {
                             }
                         }
                     });
-                });
+                })
+                .catch(err => console.error("Greška:", err));
         }
+
+        setInterval(updateBuses, 5000);
+        updateBuses();
+    </script>
+</body>
+</html>
