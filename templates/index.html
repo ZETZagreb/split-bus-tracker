@@ -14,6 +14,7 @@
         }
         #bus-search { border: none; outline: none; padding: 5px 10px; width: 200px; }
 
+        /* TVOJE BOJE: GORE BIJELO, DOLJE ŽUTO */
         .bus-badge {
             border: 2px solid #333; border-radius: 6px;
             text-align: center; font-weight: bold;
@@ -40,36 +41,45 @@
         var allBuses = [];
         var activeRoute = null;
 
-        function showLineDetails(lineId, busLat, busLon) {
-            // Čistimo staro
+        function showLineDetails(lineId) {
+            // Čistimo sve staro prije crtanja novog
             if(activeRoute) map.removeLayer(activeRoute);
             stopMarkers.forEach(m => map.removeLayer(m));
             stopMarkers = [];
 
-            // 1. Crtamo putanju po cestama (OSRM)
-            var start = [43.5147, 16.4435]; // Centar/Sukoišanska
-            fetch(`https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${busLon},${busLat}?overview=full&geometries=geojson`)
-                .then(res => res.json())
-                .then(data => {
-                    if(data.routes) {
-                        var coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-                        activeRoute = L.polyline(coords, {color: '#007bff', weight: 6, opacity: 0.5}).addTo(map);
-                    }
-                });
-
-            // 2. Dohvaćamo stanice s tvog novog API-ja
+            // Dohvaćamo stanice preko tvog app.py API-ja
             fetch(`/api/stops/${lineId}`)
                 .then(res => res.json())
                 .then(stops => {
-                    if(Array.isArray(stops)) {
+                    if(stops && stops.length > 0) {
+                        var routeCoords = [];
+                        
                         stops.forEach(stop => {
+                            // 1. Dodajemo koordinate za crtu trase
+                            routeCoords.push([stop.lat, stop.lon]);
+
+                            // 2. Kreiramo kružić za svaku stanicu
                             var m = L.circleMarker([stop.lat, stop.lon], {
-                                radius: 5, fillColor: "#ffcc00", color: "#000", weight: 1, fillOpacity: 1
+                                radius: 5,
+                                fillColor: "#ffcc00",
+                                color: "#000",
+                                weight: 1,
+                                fillOpacity: 1
                             }).addTo(map).bindPopup("<b>Stanica:</b> " + stop.name);
+                            
                             stopMarkers.push(m);
                         });
+
+                        // 3. Crtamo trasu koja točno povezuje te stanice
+                        activeRoute = L.polyline(routeCoords, {
+                            color: '#007bff',
+                            weight: 5,
+                            opacity: 0.7,
+                            lineJoin: 'round'
+                        }).addTo(map);
                     }
-                });
+                })
+                .catch(err => console.error("Greška pri dohvaćanju stanica:", err));
         }
 
         function updateBuses() {
@@ -90,13 +100,17 @@
                                 markers[bus.id].setIcon(icon);
                             } else {
                                 markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map)
-                                    .on('click', function() { showLineDetails(bus.lineId, bus.latitude, bus.longitude); });
+                                    .on('click', function() { 
+                                        // Koristimo bus.lineId ili bus.name ovisno što API šalje
+                                        showLineDetails(bus.lineId || bus.line_id); 
+                                    });
                             }
                         }
                     });
                 });
         }
 
+        // Micanje trase klikom na bilo koji dio karte koji nije bus/stanica
         map.on('click', function(e) {
             if (!e.originalEvent.target.classList.contains('leaflet-marker-icon')) {
                 if(activeRoute) map.removeLayer(activeRoute);
@@ -111,7 +125,8 @@
             var found = allBuses.find(b => b.garageNumber && b.garageNumber.toString().toLowerCase().includes(val));
             if(found && markers[found.id]) {
                 map.setView([found.latitude, found.longitude], 17);
-                showLineDetails(found.lineId, found.latitude, found.longitude);
+                markers[found.id].openPopup();
+                showLineDetails(found.lineId || found.line_id);
             }
         });
 
