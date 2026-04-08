@@ -1,148 +1,67 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Promet Split Live</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        #map { height: 100vh; width: 100%; }
-        body { margin: 0; padding: 0; font-family: sans-serif; }
+<script>
+    var map = L.map('map').setView([43.5147, 16.4435], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    var markers = {};
+    var stopMarkers = [];
+    var activeRoute = null;
+    var allRoutesData = null; // Ovdje ćemo spremiti routes.json
+
+    // Učitaj sve rute odmah pri pokretanju
+    fetch('/api/routes')
+        .then(res => res.json())
+        .then(data => { allRoutesData = data; });
+
+    function showLineDetails(lineName) {
+        if(activeRoute) map.removeLayer(activeRoute);
+        stopMarkers.forEach(m => map.removeLayer(m));
+        stopMarkers = [];
+
+        if (!allRoutesData || !lineName) return;
+
+        // Tražimo rutu u bazi prema imenu (npr. "37")
+        var route = allRoutesData.find(r => r.name == lineName || r.label == lineName);
         
-        #search-box {
-            position: absolute; top: 15px; left: 55px; z-index: 1000;
-            background: white; padding: 8px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        if(route && route.stops) {
+            var coords = [];
+            route.stops.forEach(stop => {
+                var pos = [stop.lat, stop.lon];
+                coords.push(pos);
+                
+                var m = L.circleMarker(pos, {
+                    radius: 5, fillColor: "#ffcc00", color: "#000", weight: 1, fillOpacity: 1
+                }).addTo(map).bindPopup("<b>Stanica:</b> " + stop.name);
+                stopMarkers.push(m);
+            });
+
+            activeRoute = L.polyline(coords, {
+                color: '#007bff', weight: 5, opacity: 0.7
+            }).addTo(map);
         }
-        #bus-search { border: none; outline: none; padding: 5px 10px; width: 200px; }
+    }
 
-        .bus-badge {
-            border: 2px solid #333; border-radius: 6px;
-            text-align: center; font-weight: bold;
-            display: flex; flex-direction: column; overflow: hidden;
-            background: white; box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
-        }
-        .line-text { background: #ffffff; color: black; font-size: 14px; padding: 2px 0; border-bottom: 1px solid #ccc; }
-        .garage-text { background: #ffcc00; color: black; font-size: 10px; padding: 2px 0; }
-    </style>
-</head>
-<body>
-    <div id="search-box">
-        <input type="text" id="bus-search" placeholder="Traži garažni broj...">
-    </div>
-    <div id="map"></div>
+    function updateBuses() {
+        fetch('/api/buses')
+            .then(res => res.json())
+            .then(data => {
+                var buses = data.vehicles || [];
+                buses.forEach(bus => {
+                    var label = `<div class="bus-badge"><span class="line-text">${bus.name}</span><span class="garage-text">${bus.garageNumber}</span></div>`;
+                    var icon = L.divIcon({ html: label, className: '', iconSize: [42, 38] });
+                    var popupText = `<b>Linija:</b> ${bus.name}<br><b>Gbr:</b> ${bus.garageNumber}<br><b>Tablice:</b> ${bus.registrationNumber}`;
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        var map = L.map('map').setView([43.5147, 16.4435], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-        var markers = {};
-        var stopMarkers = [];
-        var allBuses = [];
-        var activeRoute = null;
-
-        function showLineDetails(lineId) {
-            // Brisanje stare trase i stanica
-            if(activeRoute) map.removeLayer(activeRoute);
-            stopMarkers.forEach(m => map.removeLayer(m));
-            stopMarkers = [];
-
-            if (!lineId) return;
-
-            fetch(`/api/stops/${lineId}`)
-                .then(res => res.json())
-                .then(stops => {
-                    if(stops && Array.isArray(stops) && stops.length > 0) {
-                        var routeCoords = [];
-                        
-                        stops.forEach(stop => {
-                            var stopPos = [stop.lat, stop.lon];
-                            routeCoords.push(stopPos);
-
-                            // Dodavanje kružića za svaku stanicu
-                            var m = L.circleMarker(stopPos, {
-                                radius: 5,
-                                fillColor: "#ffcc00",
-                                color: "#000",
-                                weight: 1,
-                                fillOpacity: 1
-                            }).addTo(map).bindPopup("<b>Stanica:</b> " + stop.name);
-                            
-                            stopMarkers.push(m);
-                        });
-
-                        // Crtanje trase spajanjem stanica
-                        activeRoute = L.polyline(routeCoords, {
-                            color: '#007bff',
-                            weight: 5,
-                            opacity: 0.6,
-                            lineJoin: 'round'
-                        }).addTo(map);
+                    if (markers[bus.id]) {
+                        markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
+                    } else {
+                        markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon, zIndexOffset: 1000})
+                            .addTo(map)
+                            .bindPopup(popupText)
+                            .on('click', function() { showLineDetails(bus.name); });
                     }
-                })
-                .catch(err => console.log("Greška pri dohvaćanju stanica."));
-        }
-
-        function updateBuses() {
-            fetch('/api/buses')
-                .then(res => res.json())
-                .then(data => {
-                    allBuses = data.vehicles || [];
-                    allBuses.forEach(bus => {
-                        if (bus.latitude && bus.longitude) {
-                            var pos = [bus.latitude, bus.longitude];
-                            var label = `<div class="bus-badge">
-                                            <span class="line-text">${bus.name || '?'}</span>
-                                            <span class="garage-text">${bus.garageNumber || ''}</span>
-                                         </div>`;
-                            
-                            var icon = L.divIcon({ html: label, className: '', iconSize: [42, 38] });
-                            var popupText = `<b>Linija:</b> ${bus.name}<br>
-                                             <b>Gbr:</b> ${bus.garageNumber}<br>
-                                             <b>Tablice:</b> ${bus.registrationNumber || 'Nema'}`;
-
-                            if (markers[bus.id]) {
-                                markers[bus.id].setLatLng(pos);
-                                markers[bus.id].setIcon(icon);
-                                markers[bus.id].getPopup().setContent(popupText);
-                            } else {
-                                markers[bus.id] = L.marker(pos, {
-                                    icon: icon, 
-                                    zIndexOffset: 1000 
-                                }).addTo(map)
-                                .bindPopup(popupText)
-                                .on('click', function() { 
-                                    showLineDetails(bus.lineId || bus.line_id); 
-                                });
-                            }
-                        }
-                    });
                 });
-        }
+            });
+    }
 
-        // Klik na kartu čisti trasu
-        map.on('click', function(e) {
-            if (!e.originalEvent.target.classList.contains('leaflet-marker-icon')) {
-                if(activeRoute) map.removeLayer(activeRoute);
-                stopMarkers.forEach(m => map.removeLayer(m));
-                activeRoute = null;
-            }
-        });
-
-        // Tražilica po garažnom broju
-        document.getElementById('bus-search').addEventListener('input', function(e) {
-            var val = e.target.value.trim().toLowerCase();
-            if(!val) return;
-            var found = allBuses.find(b => b.garageNumber && b.garageNumber.toString().toLowerCase().includes(val));
-            if(found && markers[found.id]) {
-                map.setView(markers[found.id].getLatLng(), 17);
-                markers[found.id].openPopup();
-                showLineDetails(found.lineId || found.line_id);
-            }
-        });
-
-        setInterval(updateBuses, 5000);
-        updateBuses();
-    </script>
-</body>
-</html>
+    setInterval(updateBuses, 5000);
+    updateBuses();
+</script>
