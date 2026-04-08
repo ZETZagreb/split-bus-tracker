@@ -8,13 +8,13 @@
     <style>
         #map { height: 100vh; width: 100%; }
         body { margin: 0; padding: 0; font-family: sans-serif; }
+        
         #search-box {
             position: absolute; top: 15px; left: 55px; z-index: 1000;
             background: white; padding: 8px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
         }
         #bus-search { border: none; outline: none; padding: 5px 10px; width: 200px; }
 
-        /* TVOJE BOJE: GORE BIJELO, DOLJE ŽUTO */
         .bus-badge {
             border: 2px solid #333; border-radius: 6px;
             text-align: center; font-weight: bold;
@@ -42,24 +42,25 @@
         var activeRoute = null;
 
         function showLineDetails(lineId) {
-            // Čistimo sve staro prije crtanja novog
+            // Brisanje stare trase i stanica
             if(activeRoute) map.removeLayer(activeRoute);
             stopMarkers.forEach(m => map.removeLayer(m));
             stopMarkers = [];
 
-            // Dohvaćamo stanice preko tvog app.py API-ja
+            if (!lineId) return;
+
             fetch(`/api/stops/${lineId}`)
                 .then(res => res.json())
                 .then(stops => {
-                    if(stops && stops.length > 0) {
+                    if(stops && Array.isArray(stops) && stops.length > 0) {
                         var routeCoords = [];
                         
                         stops.forEach(stop => {
-                            // 1. Dodajemo koordinate za crtu trase
-                            routeCoords.push([stop.lat, stop.lon]);
+                            var stopPos = [stop.lat, stop.lon];
+                            routeCoords.push(stopPos);
 
-                            // 2. Kreiramo kružić za svaku stanicu
-                            var m = L.circleMarker([stop.lat, stop.lon], {
+                            // Dodavanje kružića za svaku stanicu
+                            var m = L.circleMarker(stopPos, {
                                 radius: 5,
                                 fillColor: "#ffcc00",
                                 color: "#000",
@@ -70,16 +71,16 @@
                             stopMarkers.push(m);
                         });
 
-                        // 3. Crtamo trasu koja točno povezuje te stanice
+                        // Crtanje trase spajanjem stanica
                         activeRoute = L.polyline(routeCoords, {
                             color: '#007bff',
                             weight: 5,
-                            opacity: 0.7,
+                            opacity: 0.6,
                             lineJoin: 'round'
                         }).addTo(map);
                     }
                 })
-                .catch(err => console.error("Greška pri dohvaćanju stanica:", err));
+                .catch(err => console.log("Greška pri dohvaćanju stanica."));
         }
 
         function updateBuses() {
@@ -89,28 +90,37 @@
                     allBuses = data.vehicles || [];
                     allBuses.forEach(bus => {
                         if (bus.latitude && bus.longitude) {
+                            var pos = [bus.latitude, bus.longitude];
                             var label = `<div class="bus-badge">
                                             <span class="line-text">${bus.name || '?'}</span>
                                             <span class="garage-text">${bus.garageNumber || ''}</span>
                                          </div>`;
+                            
                             var icon = L.divIcon({ html: label, className: '', iconSize: [42, 38] });
+                            var popupText = `<b>Linija:</b> ${bus.name}<br>
+                                             <b>Gbr:</b> ${bus.garageNumber}<br>
+                                             <b>Tablice:</b> ${bus.registrationNumber || 'Nema'}`;
 
                             if (markers[bus.id]) {
-                                markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
+                                markers[bus.id].setLatLng(pos);
                                 markers[bus.id].setIcon(icon);
+                                markers[bus.id].getPopup().setContent(popupText);
                             } else {
-                                markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map)
-                                    .on('click', function() { 
-                                        // Koristimo bus.lineId ili bus.name ovisno što API šalje
-                                        showLineDetails(bus.lineId || bus.line_id); 
-                                    });
+                                markers[bus.id] = L.marker(pos, {
+                                    icon: icon, 
+                                    zIndexOffset: 1000 
+                                }).addTo(map)
+                                .bindPopup(popupText)
+                                .on('click', function() { 
+                                    showLineDetails(bus.lineId || bus.line_id); 
+                                });
                             }
                         }
                     });
                 });
         }
 
-        // Micanje trase klikom na bilo koji dio karte koji nije bus/stanica
+        // Klik na kartu čisti trasu
         map.on('click', function(e) {
             if (!e.originalEvent.target.classList.contains('leaflet-marker-icon')) {
                 if(activeRoute) map.removeLayer(activeRoute);
@@ -119,12 +129,13 @@
             }
         });
 
+        // Tražilica po garažnom broju
         document.getElementById('bus-search').addEventListener('input', function(e) {
             var val = e.target.value.trim().toLowerCase();
             if(!val) return;
             var found = allBuses.find(b => b.garageNumber && b.garageNumber.toString().toLowerCase().includes(val));
             if(found && markers[found.id]) {
-                map.setView([found.latitude, found.longitude], 17);
+                map.setView(markers[found.id].getLatLng(), 17);
                 markers[found.id].openPopup();
                 showLineDetails(found.lineId || found.line_id);
             }
