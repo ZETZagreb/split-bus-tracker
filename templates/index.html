@@ -7,58 +7,50 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 100vh; width: 100%; }
-        body { margin: 0; padding: 0; font-family: sans-serif; }
+        body { margin: 0; padding: 0; }
     </style>
 </head>
 <body>
     <div id="map"></div>
-
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Postavljanje karte na Split
         var map = L.map('map').setView([43.5147, 16.4435], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         var markers = {};
 
         function updateBuses() {
             fetch('/api/buses')
-                .then(res => res.json())
-                .then(data => {
-                    data.forEach(bus => {
-                        // API podaci
-                        let lat = bus.lat;
-                        let lon = bus.lon;
-                        let linija = bus.line_name || "---";
-                        let smjer = bus.destination || "Nepoznato";
-                        let garazni = bus.device_number || bus.id;
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    data.forEach(function(bus) {
+                        var lat = bus.lat;
+                        var lon = bus.lon;
+                        
+                        // Izvlačenje podataka
+                        var linija = bus.line_name || "---";
+                        var smjer = bus.destination || "Nepoznato";
+                        var garazni = bus.device_number || bus.id;
+
+                        // Slanje teksta u popup (klasičan način bez backtickova)
+                        var popupText = "<b>Linija:</b> " + linija + "<br>" +
+                                        "<b>Smjer:</b> " + smjer + "<br>" +
+                                        "<b>Garažni broj:</b> " + garazni;
 
                         if (lat && lon) {
-                            let popupContent = `
-                                <b>Linija:</b> ${linija}<br>
-                                <b>Smjer:</b> ${smjer}<br>
-                                <b>Garažni broj:</b> ${garazni}
-                            `;
-
                             if (markers[bus.id]) {
-                                // Ako marker već postoji, samo ga pomakni
                                 markers[bus.id].setLatLng([lat, lon]);
-                                markers[bus.id].setPopupContent(popupContent);
+                                markers[bus.id].setPopupContent(popupText);
                             } else {
-                                // Ako ne postoji, stvori novi
                                 markers[bus.id] = L.marker([lat, lon])
                                     .addTo(map)
-                                    .bindPopup(popupContent);
+                                    .bindPopup(popupText);
                             }
                         }
                     });
-                })
-                .catch(err => console.error("Greška pri dohvaćanju:", err));
+                });
         }
 
-        // Osvježavaj svakih 5 sekundi
         setInterval(updateBuses, 5000);
         updateBuses();
     </script>
