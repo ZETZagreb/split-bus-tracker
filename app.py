@@ -1,5 +1,5 @@
-from flask import Flask, jsonify, render_template
 import requests
+from flask import Flask, jsonify, render_template
 
 app = Flask(__name__)
 
@@ -9,31 +9,17 @@ def index():
 
 @app.route('/api/buses')
 def get_buses():
-    try:
-        # Pokušaj dohvatiti prave podatke
-        response = requests.get("https://najava.promet-split.hr/api/get-all-vehicles", timeout=5)
-        data = response.json()
-    except:
-        data = {"vehicles": []}
-
-    # FORSIRAMO TESTNI BUS (uvijek će biti tu, čak i ako API ne radi)
-    test_bus = {
-        "id": "test-999",
-        "name": "999",
-        "garageNumber": "TEST",
-        "registrationNumber": "ST-MOD-AI",
-        "latitude": 43.5147,
-        "longitude": 16.4435
+    url = "https://najava.promet-split.hr/api/get-all-vehicles"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     }
-    
-    # Ako nema pravih buseva, stvori listu s ovim jednim
-    if not data.get('vehicles'):
-        data['vehicles'] = [test_bus]
-    else:
-        # Ako ima pravih, samo mu dodaj i ovaj naš testni na vrh
-        data['vehicles'].append(test_bus)
-        
-    return jsonify(data)
+    try:
+        # Dodajemo 'headers' da tvoj server glumi obični preglednik
+        response = requests.get(url, headers=headers, timeout=10)
+        print(f"Status koda: {response.status_code}") # Ovo ćemo vidjeti u Logs
+        return jsonify(response.json())
+    except Exception as e:
+        return jsonify({"error": str(e), "note": "Server ne moze doci do Prometa"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
