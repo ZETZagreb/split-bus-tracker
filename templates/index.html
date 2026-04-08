@@ -1,67 +1,100 @@
-<script>
-    var map = L.map('map').setView([43.5147, 16.4435], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-    var markers = {};
-    var stopMarkers = [];
-    var activeRoute = null;
-    var allRoutesData = null; // Ovdje ćemo spremiti routes.json
-
-    // Učitaj sve rute odmah pri pokretanju
-    fetch('/api/routes')
-        .then(res => res.json())
-        .then(data => { allRoutesData = data; });
-
-    function showLineDetails(lineName) {
-        if(activeRoute) map.removeLayer(activeRoute);
-        stopMarkers.forEach(m => map.removeLayer(m));
-        stopMarkers = [];
-
-        if (!allRoutesData || !lineName) return;
-
-        // Tražimo rutu u bazi prema imenu (npr. "37")
-        var route = allRoutesData.find(r => r.name == lineName || r.label == lineName);
-        
-        if(route && route.stops) {
-            var coords = [];
-            route.stops.forEach(stop => {
-                var pos = [stop.lat, stop.lon];
-                coords.push(pos);
-                
-                var m = L.circleMarker(pos, {
-                    radius: 5, fillColor: "#ffcc00", color: "#000", weight: 1, fillOpacity: 1
-                }).addTo(map).bindPopup("<b>Stanica:</b> " + stop.name);
-                stopMarkers.push(m);
-            });
-
-            activeRoute = L.polyline(coords, {
-                color: '#007bff', weight: 5, opacity: 0.7
-            }).addTo(map);
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Promet Split Live</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map { height: 100vh; width: 100%; }
+        body { margin: 0; padding: 0; background: #fff; }
+        #search-box {
+            position: absolute; top: 15px; left: 55px; z-index: 1000;
+            background: white; padding: 8px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
         }
-    }
+        #bus-search { border: none; outline: none; padding: 5px 10px; width: 180px; }
+        .bus-badge {
+            border: 2px solid #333; border-radius: 6px; text-align: center; font-weight: bold;
+            display: flex; flex-direction: column; overflow: hidden; background: white;
+        }
+        .line-text { background: #ffffff; color: black; font-size: 14px; padding: 1px 0; }
+        .garage-text { background: #ffcc00; color: black; font-size: 10px; padding: 1px 0; }
+    </style>
+</head>
+<body>
+    <div id="search-box"><input type="text" id="bus-search" placeholder="Garažni broj..."></div>
+    <div id="map"></div>
 
-    function updateBuses() {
-        fetch('/api/buses')
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([43.5147, 16.4435], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        var markers = {};
+        var stopMarkers = [];
+        var activeRoute = null;
+        var allRoutes = [];
+        var busData = [];
+
+        // 1. Dohvati sve rute (stanice)
+        fetch('/api/routes')
             .then(res => res.json())
-            .then(data => {
-                var buses = data.vehicles || [];
-                buses.forEach(bus => {
-                    var label = `<div class="bus-badge"><span class="line-text">${bus.name}</span><span class="garage-text">${bus.garageNumber}</span></div>`;
-                    var icon = L.divIcon({ html: label, className: '', iconSize: [42, 38] });
-                    var popupText = `<b>Linija:</b> ${bus.name}<br><b>Gbr:</b> ${bus.garageNumber}<br><b>Tablice:</b> ${bus.registrationNumber}`;
+            .then(data => { allRoutes = data; })
+            .catch(e => console.log("Greška rute"));
 
-                    if (markers[bus.id]) {
-                        markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
-                    } else {
-                        markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon, zIndexOffset: 1000})
-                            .addTo(map)
-                            .bindPopup(popupText)
-                            .on('click', function() { showLineDetails(bus.name); });
-                    }
+        function drawRoute(lineName) {
+            if(activeRoute) map.removeLayer(activeRoute);
+            stopMarkers.forEach(m => map.removeLayer(m));
+            stopMarkers = [];
+
+            // Tražimo rutu koja se zove npr. "37"
+            var route = allRoutes.find(r => r.name == lineName);
+            if(route && route.stops) {
+                var coords = [];
+                route.stops.forEach(s => {
+                    coords.push([s.lat, s.lon]);
+                    var sm = L.circleMarker([s.lat, s.lon], {
+                        radius: 4, fillColor: "#ffcc00", color: "#000", weight: 1, fillOpacity: 1
+                    }).addTo(map).bindPopup(s.name);
+                    stopMarkers.push(sm);
                 });
-            });
-    }
+                activeRoute = L.polyline(coords, {color: '#007bff', weight: 4}).addTo(map);
+            }
+        }
 
-    setInterval(updateBuses, 5000);
-    updateBuses();
-</script>
+        function updateBuses() {
+            fetch('/api/buses')
+                .then(res => res.json())
+                .then(data => {
+                    busData = data.vehicles || [];
+                    busData.forEach(bus => {
+                        var label = `<div class="bus-badge"><span class="line-text">${bus.name}</span><span class="garage-text">${bus.garageNumber}</span></div>`;
+                        var icon = L.divIcon({ html: label, className: '', iconSize: [40, 35] });
+                        var popupText = `Linija: ${bus.name}<br>Gbr: ${bus.garageNumber}<br>Reg: ${bus.registrationNumber}`;
+
+                        if (markers[bus.id]) {
+                            markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
+                        } else {
+                            markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon, zIndexOffset: 1000})
+                                .addTo(map).bindPopup(popupText)
+                                .on('click', () => drawRoute(bus.name));
+                        }
+                    });
+                });
+        }
+
+        document.getElementById('bus-search').addEventListener('input', (e) => {
+            var val = e.target.value;
+            var found = busData.find(b => b.garageNumber == val);
+            if(found) {
+                map.setView([found.latitude, found.longitude], 16);
+                markers[found.id].openPopup();
+                drawRoute(found.name);
+            }
+        });
+
+        setInterval(updateBuses, 5000);
+        updateBuses();
+    </script>
+</body>
+</html>
