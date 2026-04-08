@@ -1,5 +1,5 @@
-import requests
 from flask import Flask, jsonify, render_template
+import requests
 
 app = Flask(__name__)
 
@@ -10,34 +10,30 @@ def index():
 @app.route('/api/buses')
 def get_buses():
     try:
-        url = "https://najava.promet-split.hr/api/get-all-vehicles"
-        response = requests.get(url, timeout=10)
+        # Pokušaj dohvatiti prave podatke
+        response = requests.get("https://najava.promet-split.hr/api/get-all-vehicles", timeout=5)
         data = response.json()
+    except:
+        data = {"vehicles": []}
 
-        # TESTNA LOGIKA: Ako nema pravih buseva, dodajemo jedan lažni
-        if not data.get('vehicles'):
-            data['vehicles'] = [{
-                "id": "test-123",
-                "name": "TEST",
-                "garageNumber": "999",
-                "registrationNumber": "ST 0000 TEST",
-                "latitude": 43.5100,  # Lokacija negdje kod općine
-                "longitude": 16.4400
-            }]
-            
-        return jsonify(data)
-    except Exception as e:
-        # Čak i ako se API skroz sruši, poslat ćemo testni bus da vidiš da aplikacija radi
-        test_data = {
-            "vehicles": [{
-                "id": "test-123",
-                "name": "ERROR-TEST",
-                "garageNumber": "ERR",
-                "latitude": 43.5100,
-                "longitude": 16.4400
-            }]
-        }
-        return jsonify(test_data)
+    # FORSIRAMO TESTNI BUS (uvijek će biti tu, čak i ako API ne radi)
+    test_bus = {
+        "id": "test-999",
+        "name": "999",
+        "garageNumber": "TEST",
+        "registrationNumber": "ST-MOD-AI",
+        "latitude": 43.5147,
+        "longitude": 16.4435
+    }
+    
+    # Ako nema pravih buseva, stvori listu s ovim jednim
+    if not data.get('vehicles'):
+        data['vehicles'] = [test_bus]
+    else:
+        # Ako ima pravih, samo mu dodaj i ovaj naš testni na vrh
+        data['vehicles'].append(test_bus)
+        
+    return jsonify(data)
 
 if __name__ == '__main__':
     app.run(debug=True)
