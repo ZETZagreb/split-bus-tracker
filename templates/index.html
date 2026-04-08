@@ -7,55 +7,213 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 100vh; width: 100%; }
-        body { margin: 0; padding: 0; font-family: sans-serif; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+        /* --- STIL ZA TRAŽILICU --- */
+        #search-box {
+            position: absolute;
+            top: 15px;
+            left: 55px; /* Da ne prekrije gumbe za zoom */
+            z-index: 1000;
+            background: white;
+            padding: 8px;
+            border-radius: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+        }
+        #bus-search {
+            border: none;
+            outline: none;
+            padding: 5px 10px;
+            width: 220px;
+            font-size: 14px;
+        }
+
+        /* --- STIL ZA NALJEPNICU AUTOBUSA (IKONA) --- */
         .bus-badge {
-            background: #ffcc00;
-            border: 2px solid #000;
-            border-radius: 5px;
-            color: #000;
+            border: 2px solid #333;
+            border-radius: 6px;
+            color: black;
             font-weight: bold;
             text-align: center;
-            font-size: 12px;
-            padding: 2px;
+            box-shadow: 2px 2px 6px rgba(0,0,0,0.4);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: white; /* Default pozadina */
+        }
+        
+        /* Gornji dio - BIJELO (za broj linije) */
+        .line-text {
+            font-size: 14px;
+            line-height: 1.1;
+            padding: 3px 0;
+            background: #ffffff; /* Čista bijela */
+            border-bottom: 1px solid #ccc;
+        }
+        
+        /* Donji dio - ŽUTO (za garažni broj) */
+        .garage-text {
+            font-size: 9px;
+            margin-top: auto;
+            padding: 2px 0;
+            color: #444;
+            background: #ffcc00; /* Prepoznatljiva žuta */
         }
     </style>
 </head>
 <body>
+
+    <div id="search-box">
+        <input type="text" id="bus-search" placeholder="Traži garažni broj (npr. 123)...">
+    </div>
+
     <div id="map"></div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = L.map('map').setView([43.5147, 16.4435], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
 
         var markers = {};
+        var allBuses = [];
+        var currentRouteLine = null; // Spremnik za trenutno nacrtanu trasu
+
+        // --- DEFINICIJA TRASA (RUTE) ---
+        // Budući da API ne šalje trase, moramo ih sami nacrtati ručno.
+        // Evo primjer za liniju 37 (Sukoišanska - Zračna luka).
+        // Za druge linije trebaš sam dodati koordinate na isti način.
+        var busRoutes = {
+            "37": [
+                [43.5147, 16.4435], // Split (Sukoišanska)
+                [43.5200, 16.4480],
+                [43.5350, 16.4300], // Solin
+                [43.5450, 16.3900], // Kaštel Sućurac
+                [43.5550, 16.3500], // Kaštel Gomilica
+                [43.5500, 16.3200], // Kaštel Stari
+                [43.5413, 16.2991]  // Zračna luka
+            ],
+            // "LINIJA_BROJ": [[lat1, lon1], [lat2, lon2], ...]
+        };
 
         function updateBuses() {
-            // KORISTIMO PROXY TUNEL DA ZAOBIĐEMO BLOKADU
-            const proxy = "https://corsproxy.io/?";
-            const url = "https://najava.promet-split.hr/api/get-all-vehicles";
-
-            fetch(proxy + encodeURIComponent(url))
+            fetch('/api/buses')
                 .then(res => res.json())
                 .then(data => {
-                    const vehicles = data.vehicles || [];
-                    vehicles.forEach(bus => {
-                        if (bus.latitude && bus.longitude) {
-                            const pos = [bus.latitude, bus.longitude];
-                            const label = `<div class="bus-badge">${bus.name}<br>${bus.garageNumber}</div>`;
-                            const icon = L.divIcon({ html: label, className: '', iconSize: [40, 35] });
+                    allBuses = data.vehicles || [];
+                    
+                    allBuses.forEach(bus => {
+                        var lat = bus.latitude;
+                        var lon = bus.longitude;
+                        
+                        if (lat && lon) {
+                            var linija = bus.name || "?";
+                            var garazni = bus.garageNumber || "?";
+                            var reg = bus.registrationNumber || "";
+
+                            // Kreiramo HTML za našu novu ikonu s BIJELO-ŽUTIM stilom
+                            var iconHtml = '<div class="bus-badge">' +
+                                           '<span class="line-text">' + linija + '</span>' +
+                                           '<span class="garage-text">' + garazni + '</span>' +
+                                           '</div>';
+
+                            var customIcon = L.divIcon({
+                                html: iconHtml,
+                                className: '', // Resetiramo defaultne stilove
+                                iconSize: [42, 38], // Malo veća ikona za bolju čitljivost
+                                iconAnchor: [21, 19]
+                            });
+
+                            var popupContent = "<b>Linija:</b> " + linija + "<br>" +
+                                               "<b>Garažni broj:</b> " + garazni + "<br>" +
+                                               "<b>Registracija:</b> " + reg;
 
                             if (markers[bus.id]) {
-                                markers[bus.id].setLatLng(pos);
+                                markers[bus.id].setLatLng([lat, lon]);
+                                markers[bus.id].setIcon(customIcon);
+                                markers[bus.id].getPopup().setContent(popupContent);
+                                
+                                // Ažuriramo povezani ID linije ako se bus premjesti
+                                markers[bus.id].options.routeId = linija; 
                             } else {
-                                markers[bus.id] = L.marker(pos, {icon: icon}).addTo(map)
-                                    .bindPopup(`Linija: ${bus.name}<br>Reg: ${bus.registrationNumber}`);
+                                markers[bus.id] = L.marker([lat, lon], {icon: customIcon, routeId: linija})
+                                    .addTo(map)
+                                    .bindPopup(popupContent);
+                                
+                                // --- LOGIKA KLIKA NA BUS (CRTANJE TRASE) ---
+                                markers[bus.id].on('click', function(e) {
+                                    drawRouteLine(e.target.options.routeId);
+                                });
                             }
                         }
                     });
-                })
-                .catch(err => console.log("Greška pri dohvaćanju..."));
+                });
         }
 
+        // --- FUNKCIJA ZA CRTANJE TRASE ---
+        function drawRouteLine(routeId) {
+            // Ukloni staru trasu ako postoji
+            if (currentRouteLine) {
+                map.removeLayer(currentRouteLine);
+                currentRouteLine = null;
+            }
+
+            // Provjeri imamo li definiranu trasu za ovu liniju
+            if (busRoutes[routeId]) {
+                var coords = busRoutes[routeId];
+                
+                // Nacrtaj plavu crtu (L.polyline)
+                currentRouteLine = L.polyline(coords, {
+                    color: '#007bff', // Plava boja trase
+                    weight: 5,
+                    opacity: 0.7,
+                    smoothFactor: 1
+                }).addTo(map);
+                
+                // Opcija: Prilagodi pogled karte da vidi cijelu trasu
+                // map.fitBounds(currentRouteLine.getBounds(), {padding: [50, 50]});
+            } else {
+                console.log("Nema definisane trase za liniju: " + routeId);
+            }
+        }
+
+        // --- UKLONI TRASU KLIKOM NA KARTU ---
+        map.on('click', function(e) {
+            // Provjeri je li kliknuto na kartu, a ne na marker
+            if (!e.originalEvent.target.classList.contains('leaflet-marker-icon')) {
+                if (currentRouteLine) {
+                    map.removeLayer(currentRouteLine);
+                    currentRouteLine = null;
+                }
+            }
+        });
+
+        // --- PROMIJENJENA LOGIKA TRAŽILICE (SADA TRAŽI GARAŽNI BROJ) ---
+        document.getElementById('bus-search').addEventListener('input', function(e) {
+            var searchVal = e.target.value.trim().toLowerCase();
+            if (searchVal === "") return;
+
+            // Tražimo bus koji odgovara upisanom GARAŽNOM broju
+            var found = allBuses.find(b => b.garageNumber && b.garageNumber.toLowerCase() === searchVal);
+            
+            // Ako ne nađemo točno, tražimo bilo koji koji sadrži taj dio broja
+            if (!found) {
+                found = allBuses.find(b => b.garageNumber && b.garageNumber.toLowerCase().includes(searchVal));
+            }
+
+            if (found && markers[found.id]) {
+                map.setView([found.latitude, found.longitude], 17); // Malo jači zoom na nađeni bus
+                markers[found.id].openPopup();
+                
+                // Automatski nacrtaj trasu za nađeni bus
+                drawRouteLine(found.name);
+            }
+        });
+
+        // Osvježavanje svakih 5 sekundi
         setInterval(updateBuses, 5000);
         updateBuses();
     </script>
