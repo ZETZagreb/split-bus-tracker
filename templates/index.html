@@ -7,53 +7,58 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 100vh; width: 100%; }
-        body { margin: 0; padding: 0; font-family: sans-serif; }
+        body { margin: 0; padding: 0; font-family: 'Arial', sans-serif; }
         
         #search-box {
             position: absolute; top: 15px; left: 55px; z-index: 1000;
-            background: white; padding: 8px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            background: white; padding: 8px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
         }
-        #bus-search { border: none; outline: none; padding: 5px 10px; width: 180px; }
+        #bus-search { border: none; outline: none; padding: 5px; width: 150px; font-weight: bold; }
 
-        /* --- DIZAJN IKONA U OBLIKU BUSA --- */
+        /* --- DIZAJN IKONE: PRAVOKUTNI AUTOBUS --- */
         .bus-marker {
-            border-radius: 15px 4px 4px 15px; /* Zaobljen naprijed */
-            border: 1.2px solid #333;
-            display: flex; flex-direction: column;
-            overflow: hidden; box-shadow: 3px 3px 8px rgba(0,0,0,0.4);
+            border-radius: 4px; /* Pravokutni oblik */
+            border: 1.5px solid #222;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 2px 4px 6px rgba(0,0,0,0.4);
             background: #fff;
         }
 
-        /* Gornji dio: BIJELO + NARANČASTI BROJ */
+        /* Gornji dio: Bijelo + Narančasta linija */
         .line-section {
-            background: #ffffff; height: 40%; 
-            display: flex; align-items: center; justify-content: center;
-            border-bottom: 1px solid #eee; position: relative;
+            background: #ffffff;
+            height: 38%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 1px solid #ddd;
         }
-        
-        .line-section::before {
-            content: ''; position: absolute; left: 0; top: 0; bottom: 0;
-            width: 4px; background: #add8e6; /* Šoferšajbna efekt */
-        }
-
         .line-text {
-            color: #ff7f00; font-size: 10px; font-weight: 800;
+            color: #ff7f00;
+            font-size: 10px;
+            font-weight: 800;
         }
 
-        /* Donji dio: ŽUTO + VELIKI BIJELI GARAŽNI */
+        /* Donji dio: Žuto + Veliki bijeli garažni broj */
         .garage-section {
-            background: #ffcc00; height: 60%; 
-            display: flex; align-items: center; justify-content: center;
+            background: #ffcc00;
+            height: 62%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-
         .garage-text {
-            color: #ffffff; font-size: 14px; font-weight: 900; 
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 900;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
         }
     </style>
 </head>
 <body>
-    <div id="search-box"><input type="text" id="bus-search" placeholder="Traži garažni broj..."></div>
+    <div id="search-box"><input type="text" id="bus-search" placeholder="Garažni broj..."></div>
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -67,80 +72,87 @@
         var allRoutes = [];
         var busData = [];
 
-        // 1. Učitaj bazu ruta odmah
+        // Dohvaćanje ruta odmah pri pokretanju
         fetch('/api/routes')
             .then(res => res.json())
             .then(data => { 
                 allRoutes = data; 
-                console.log("Sustav ruta spreman."); 
+                console.log("Sustav ruta učitan."); 
             });
 
-        // 2. Funkcija za crtanje trase i stanica
+        // Funkcija za crtanje linije i stanica
         function drawRoute(lineName) {
+            console.log("Crtam rutu za:", lineName);
             if(activeRoute) map.removeLayer(activeRoute);
             stopMarkers.forEach(m => map.removeLayer(m));
             stopMarkers = [];
 
-            var route = allRoutes.find(r => r.name == lineName || r.label == lineName);
+            // Čistimo naziv (makni "Linija " ako postoji)
+            var cleanName = lineName.toString().replace("Linija ", "").trim();
+
+            var route = allRoutes.find(r => 
+                r.name.toString().trim() == cleanName || 
+                r.label == cleanName
+            );
+
             if(route && route.stops) {
                 var coords = [];
                 route.stops.forEach(s => {
                     coords.push([s.lat, s.lon]);
                     var sm = L.circleMarker([s.lat, s.lon], {
                         radius: 5, fillColor: "#ffcc00", color: "#000", weight: 1, fillOpacity: 1
-                    }).addTo(map).bindPopup("<b>Stanica:</b> " + s.name);
+                    }).addTo(map).bindPopup("Stanica: " + s.name);
                     stopMarkers.push(sm);
                 });
-                activeRoute = L.polyline(coords, {color: '#007bff', weight: 4, opacity: 0.7}).addTo(map);
+                activeRoute = L.polyline(coords, {color: '#007bff', weight: 4, opacity: 0.8}).addTo(map);
             }
         }
 
-        // 3. Glavna funkcija za osvježavanje buseva (UpdateBuses)
+        // Glavna funkcija za osvježavanje buseva
         function updateBuses() {
             fetch('/api/buses')
                 .then(res => res.json())
                 .then(data => {
                     busData = data.vehicles || [];
                     busData.forEach(bus => {
-                        var cleanLine = bus.name.toString().replace("Linija ", "").trim();
+                        var lineDisplay = bus.name.toString().replace("Linija ", "").trim();
                         
-                        var iconHtml = `<div class="bus-marker">
-                                            <div class="line-section"><span class="line-text">${cleanLine}</span></div>
-                                            <div class="garage-section"><span class="garage-text">${bus.garageNumber}</span></div>
-                                        </div>`;
+                        var iconHtml = `
+                            <div class="bus-marker">
+                                <div class="line-section"><span class="line-text">${lineDisplay}</span></div>
+                                <div class="garage-section"><span class="garage-text">${bus.garageNumber}</span></div>
+                            </div>`;
                         
                         var icon = L.divIcon({ 
-                            html: iconHtml, className: '', 
-                            iconSize: [48, 34], iconAnchor: [24, 17] 
+                            html: iconHtml, 
+                            className: '', 
+                            iconSize: [45, 35], 
+                            iconAnchor: [22, 17] 
                         });
-
-                        var popupContent = `<b>Linija:</b> ${bus.name}<br><b>Gbr:</b> ${bus.garageNumber}<br><b>Reg:</b> ${bus.registrationNumber}`;
 
                         if (markers[bus.id]) {
                             markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
-                            markers[bus.id].getPopup().setContent(popupContent);
                         } else {
                             markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon, zIndexOffset: 1000})
                                 .addTo(map)
-                                .bindPopup(popupContent)
-                                .on('click', () => drawRoute(bus.name)); // KLIK CRTA RUTU
+                                .bindPopup(`<b>Linija:</b> ${bus.name}<br><b>Garažni:</b> ${bus.garageNumber}`)
+                                .on('click', () => drawRoute(bus.name));
                         }
                     });
                 });
         }
 
-        // 4. Tražilica
+        // Pretraga
         document.getElementById('bus-search').addEventListener('input', (e) => {
             var val = e.target.value;
             var found = busData.find(b => b.garageNumber == val);
-            if(found && markers[found.id]) {
+            if(found) {
                 map.setView([found.latitude, found.longitude], 16);
                 markers[found.id].openPopup();
                 drawRoute(found.name);
             }
         });
 
-        // Pokretanje
         setInterval(updateBuses, 5000);
         updateBuses();
     </script>
