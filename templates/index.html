@@ -15,7 +15,7 @@
         }
         #bus-search { border: none; outline: none; padding: 5px; width: 150px; font-weight: bold; }
 
-        /* --- DIZAJN IKONE: PRAVOKUTNI AUTOBUS --- */
+        /* PRAVOKUTNI BUS DIZAJN */
         .bus-marker {
             border-radius: 4px;
             border: 1.5px solid #222;
@@ -68,11 +68,18 @@
                         
                         var icon = L.divIcon({ html: iconHtml, className: '', iconSize: [45, 35], iconAnchor: [22, 17] });
 
-                        // Ovdje su vraćene tablice (registrationNumber)
+                        // NOVO: Relacija i vrijeme polaska
+                        var relacija = (bus.origin && bus.destination) ? `${bus.origin} ➔ ${bus.destination}` : "Nije dostupno";
+                        var kretanje = bus.departureTime ? bus.departureTime : "Nepoznato";
+
                         var popupContent = `
-                            <b>Linija:</b> ${bus.name}<br>
-                            <b>Garažni br:</b> ${bus.garageNumber}<br>
-                            <b>Registracija:</b> ${bus.registrationNumber || 'Nije dostupno'}
+                            <div style="font-family: sans-serif; line-height: 1.4;">
+                                <b>Linija ${bus.name}</b> (Gbr: ${bus.garageNumber})<br>
+                                <hr style="margin: 5px 0; border: 0; border-top: 1px solid #eee;">
+                                <b>Relacija:</b> ${relacija}<br>
+                                <b>Krenuo u:</b> ${kretanje}<br>
+                                <b>Registracija:</b> ${bus.registrationNumber || '---'}
+                            </div>
                         `;
 
                         if (markers[bus.id]) {
@@ -87,7 +94,6 @@
                 });
         }
 
-        // Pretraga
         document.getElementById('bus-search').addEventListener('input', (e) => {
             var val = e.target.value;
             var found = busData.find(b => b.garageNumber == val);
