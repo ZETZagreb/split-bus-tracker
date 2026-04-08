@@ -7,18 +7,50 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 100vh; width: 100%; }
-        body { margin: 0; padding: 0; background: #fff; }
+        body { margin: 0; padding: 0; }
+        
         #search-box {
             position: absolute; top: 15px; left: 55px; z-index: 1000;
             background: white; padding: 8px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
         }
         #bus-search { border: none; outline: none; padding: 5px 10px; width: 180px; }
-        .bus-badge {
-            border: 2px solid #333; border-radius: 6px; text-align: center; font-weight: bold;
-            display: flex; flex-direction: column; overflow: hidden; background: white;
+
+        /* --- OVDJE JE SAV DIZAJN IKONA --- */
+        .bus-marker {
+            /* Osnovni oblik busa - oblina naprijed, ravno straga */
+            border-radius: 12px 6px 6px 12px;
+            border: 1.5px solid #000; /* Crni rub oko cijelog busa */
+            display: flex; flex-direction: column; 
+            overflow: hidden; /* Da se boje ne prelijevaju preko ruba */
+            box-shadow: 2px 3px 6px rgba(0,0,0,0.4); /* Sjaj */
+            transition: transform 0.2s; /* Glatki efekt kad se pomakne */
         }
-        .line-text { background: #ffffff; color: black; font-size: 14px; padding: 1px 0; }
-        .garage-text { background: #ffcc00; color: black; font-size: 10px; padding: 1px 0; }
+        .bus-marker:hover { transform: scale(1.1); /* Povećaj kad pređeš mišem */ }
+
+        /* Gornji dio: BIJELO s NARANČASTIM brojevima linije */
+        .line-section { 
+            background: #ffffff; 
+            height: 55%; /* Gornja polovica je malo veća */
+            display: flex; align-items: center; justify-content: center;
+            border-bottom: 1px solid #ccc; /* Tanka crta između boja */
+        }
+        .line-text { 
+            color: #ff7f00; /* TVOJA BOJA: Narančasti brojevi */
+            font-size: 14px; font-weight: 800; font-family: 'Arial Black', sans-serif;
+            letter-spacing: -1px; /* Malo stisnuti brojevi */
+        }
+
+        /* Donji dio: ŽUTO s BIJELIM garažnim brojevima */
+        .garage-section { 
+            background: #ffcc00; /* TVOJA BOJA: Žuta podloga */
+            height: 45%; 
+            display: flex; align-items: center; justify-content: center;
+        }
+        .garage-text { 
+            color: #ffffff; /* TVOJA BOJA: Bijeli brojevi */
+            font-size: 10px; font-weight: 700; font-family: Arial, sans-serif;
+            text-shadow: 0px 1px 2px rgba(0,0,0,0.5); /* Mala sjena ispod bijelih brojeva da se bolje vide */
+        }
     </style>
 </head>
 <body>
@@ -31,36 +63,7 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         var markers = {};
-        var stopMarkers = [];
-        var activeRoute = null;
-        var allRoutes = [];
         var busData = [];
-
-        // 1. Dohvati sve rute (stanice)
-        fetch('/api/routes')
-            .then(res => res.json())
-            .then(data => { allRoutes = data; })
-            .catch(e => console.log("Greška rute"));
-
-        function drawRoute(lineName) {
-            if(activeRoute) map.removeLayer(activeRoute);
-            stopMarkers.forEach(m => map.removeLayer(m));
-            stopMarkers = [];
-
-            // Tražimo rutu koja se zove npr. "37"
-            var route = allRoutes.find(r => r.name == lineName);
-            if(route && route.stops) {
-                var coords = [];
-                route.stops.forEach(s => {
-                    coords.push([s.lat, s.lon]);
-                    var sm = L.circleMarker([s.lat, s.lon], {
-                        radius: 4, fillColor: "#ffcc00", color: "#000", weight: 1, fillOpacity: 1
-                    }).addTo(map).bindPopup(s.name);
-                    stopMarkers.push(sm);
-                });
-                activeRoute = L.polyline(coords, {color: '#007bff', weight: 4}).addTo(map);
-            }
-        }
 
         function updateBuses() {
             fetch('/api/buses')
@@ -68,30 +71,40 @@
                 .then(data => {
                     busData = data.vehicles || [];
                     busData.forEach(bus => {
-                        var label = `<div class="bus-badge"><span class="line-text">${bus.name}</span><span class="garage-text">${bus.garageNumber}</span></div>`;
-                        var icon = L.divIcon({ html: label, className: '', iconSize: [40, 35] });
-                        var popupText = `Linija: ${bus.name}<br>Gbr: ${bus.garageNumber}<br>Reg: ${bus.registrationNumber}`;
+                        // Čistimo ime linije (da bude samo broj, npr. 37, a ne Linija 37)
+                        var cleanLine = bus.name.toString().replace("Linija ", "").trim();
+                        
+                        // --- KREIRANJE TVOJE IKONE ---
+                        var iconHtml = `<div class="bus-marker">
+                                            <div class="line-section">
+                                                <span class="line-text">${cleanLine}</span>
+                                            </div>
+                                            <div class="garage-section">
+                                                <span class="garage-text">${bus.garageNumber}</span>
+                                            </div>
+                                        </div>`;
+                        
+                        var icon = L.divIcon({ 
+                            html: iconHtml, 
+                            className: '', 
+                            iconSize: [42, 36], // Malo veće da stane tekst
+                            iconAnchor: [21, 36] // Sidro na dnu-sredini
+                        });
+
+                        var popupText = `<b>Linija:</b> ${bus.name}<br><b>Gbr:</b> ${bus.garageNumber}<br><b>Reg:</b> ${bus.registrationNumber}`;
 
                         if (markers[bus.id]) {
                             markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
+                            markers[bus.id].getPopup().setContent(popupText);
                         } else {
-                            markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon, zIndexOffset: 1000})
-                                .addTo(map).bindPopup(popupText)
-                                .on('click', () => drawRoute(bus.name));
+                            markers[bus.id] = L.marker([bus.latitude, bus.longitude], {
+                                icon: icon, 
+                                zIndexOffset: 1000 
+                            }).addTo(map).bindPopup(popupText);
                         }
                     });
                 });
         }
-
-        document.getElementById('bus-search').addEventListener('input', (e) => {
-            var val = e.target.value;
-            var found = busData.find(b => b.garageNumber == val);
-            if(found) {
-                map.setView([found.latitude, found.longitude], 16);
-                markers[found.id].openPopup();
-                drawRoute(found.name);
-            }
-        });
 
         setInterval(updateBuses, 5000);
         updateBuses();
