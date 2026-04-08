@@ -16,6 +16,7 @@
             font-weight: bold;
             text-align: center;
             font-family: sans-serif;
+            padding: 2px;
         }
     </style>
 </head>
@@ -29,34 +30,26 @@
         var markers = {};
 
         function updateBuses() {
-            console.log("Dohvaćam podatke...");
-            fetch('/api/buses')
+            // SADA DIREKTNO GAĐAMO PROMET SPLIT IZ TVOG PREGLEDNIKA
+            fetch('https://najava.promet-split.hr/api/get-all-vehicles')
                 .then(res => res.json())
                 .then(data => {
-                    console.log("Podaci primljeni:", data);
                     var list = data.vehicles || [];
-                    
                     list.forEach(bus => {
                         if (bus.latitude && bus.longitude) {
                             var pos = [bus.latitude, bus.longitude];
                             var label = `<div class="bus-badge">${bus.name}<br><small>${bus.garageNumber}</small></div>`;
-                            
-                            var icon = L.divIcon({
-                                html: label,
-                                className: '',
-                                iconSize: [40, 35]
-                            });
+                            var icon = L.divIcon({ html: label, className: '', iconSize: [40, 35] });
 
                             if (markers[bus.id]) {
                                 markers[bus.id].setLatLng(pos);
                             } else {
                                 markers[bus.id] = L.marker(pos, {icon: icon}).addTo(map);
-                                markers[bus.id].bindPopup("Registracija: " + bus.registrationNumber);
                             }
                         }
                     });
                 })
-                .catch(err => console.error("Greška:", err));
+                .catch(err => console.log("Čekamo podatke..."));
         }
 
         setInterval(updateBuses, 5000);
