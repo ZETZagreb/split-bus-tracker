@@ -1,25 +1,39 @@
-// Unutar updateBuses funkcije u index.html zamijeni popup dio:
+// Unutar tvoje funkcije updateBuses, tamo gdje stvaraš popup:
+function updateBuses() {
+    fetch('/api/buses').then(res => res.json()).then(data => {
+        (data.vehicles || []).forEach(bus => {
+            
+            // Definiranje izgleda prozorčića s podacima s Fleeta
+            var popupContent = `
+                <div style="min-width: 200px;">
+                    <b>Linija ${bus.name}</b> (Gbr: ${bus.garageNumber})<br>
+                    <hr>
+                    <b>Relacija:</b> ${bus.origin || 'Učitavanje...'} ➔ ${bus.destination || 'Učitavanje...'}<br>
+                    <b>Krenuo:</b> ${bus.departureTime || 'Nepoznato'}<br>
+                    <b>Brzina:</b> ${bus.speed || '0'} km/h<br>
+                    <b>Sljedeća stanica:</b> ${bus.nextStopName || 'Provjera...'}
+                </div>
+            `;
 
-var popup = `
-    <div style="min-width: 200px;">
-        <b style="font-size: 14px;">Linija ${bus.name}</b> (Gbr: ${bus.garageNumber})<br>
-        <hr style="margin: 5px 0;">
-        <b>Relacija:</b> ${bus.origin || 'Učitavanje...'} ➔ ${bus.destination || 'Učitavanje...'}<br>
-        <b>Krenuo:</b> ${bus.departureTime || 'Nepoznato'}<br>
-        <b>Trenutna brzina:</b> ${bus.speed || '0'} km/h<br>
-        <b>Sljedeća stanica:</b> <span id="next-stop-${bus.id}">${bus.nextStopName || 'Provjera...'}</span>
-    </div>
-`;
-
-// Dodatna logika za crtanje stanica sa slike
-markers[bus.id].on('click', function() {
-    // Pozivamo naš novi most za detalje sa slike 
-    fetch(`/api/fleet_details/${bus.tripId}`)
-        .then(res => res.json())
-        .then(data => {
-            if(data.stops) {
-                // Ovdje crtamo trasu i stanice točno onako kako ih vidiš na fleet.promet-split.hr
-                drawFleetRoute(data.stops);
+            if (markers[bus.id]) {
+                markers[bus.id].setLatLng([bus.latitude, bus.longitude]).setPopupContent(popupContent);
+            } else {
+                // Stvaranje novog markera ako ne postoji
+                markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: tvojaIkona})
+                    .addTo(map).bindPopup(popupContent);
+                
+                // Na klik povuci detaljnu trasu i stanice
+                markers[bus.id].on('click', () => {
+                    if(bus.tripId) {
+                        fetch(`/api/trip_details/${bus.tripId}`)
+                            .then(res => res.json())
+                            .then(tripData => {
+                                console.log("Detalji rute učitani za gbr:", bus.garageNumber);
+                                // Ovdje možeš dodati crtanje stanica na mapu
+                            });
+                    }
+                });
             }
         });
-});
+    });
+}
