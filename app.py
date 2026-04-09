@@ -11,9 +11,8 @@ def index():
 @app.route('/api/buses')
 def get_buses():
     url = "https://www.bus-split.com/api/vehicles/live"
-    # Dodajemo headers da izgledamo kao prava stranica s tvoje slike
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0',
         'Referer': 'https://fleet.promet-split.hr/'
     }
     try:
@@ -22,14 +21,11 @@ def get_buses():
     except:
         return jsonify({"vehicles": []})
 
-# Ova ruta izvlači "Detalje putovanja" sa slike koju si poslao
-@app.route('/api/fleet_details/<trip_id>')
-def get_fleet_details(trip_id):
+# Ova ruta rješava problem "Nije dostupno" povlačenjem detalja putovanja
+@app.route('/api/trip_details/<trip_id>')
+def get_trip_details(trip_id):
     url = f"https://www.bus-split.com/api/trip-details/{trip_id}"
-    headers = {
-        'User-Agent': 'Mozilla/5.0',
-        'Referer': 'https://fleet.promet-split.hr/'
-    }
+    headers = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://fleet.promet-split.hr/'}
     try:
         r = requests.get(url, headers=headers)
         return jsonify(r.json())
