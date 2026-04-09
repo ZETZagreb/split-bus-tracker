@@ -11,22 +11,23 @@ def index():
 @app.route('/api/buses')
 def get_buses():
     url = "https://www.bus-split.com/api/vehicles/live"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         r = requests.get(url, headers=headers, timeout=10)
         return jsonify(r.json())
     except:
         return jsonify({"vehicles": []})
 
-@app.route('/api/routes')
-def get_routes():
-    url = "https://www.bus-split.com/api/routes.json"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+# Ova ruta sada traži stanice za BILO KOJU liniju (ID) koju klikneš
+@app.route('/api/route_details/<line_id>')
+def get_route_details(line_id):
+    url = f"https://www.bus-split.com/api/route-stops/{line_id}"
+    headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         r = requests.get(url, headers=headers, timeout=10)
         return jsonify(r.json())
     except:
-        return jsonify([])
+        return jsonify({"stops": []})
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
