@@ -1,39 +1,57 @@
-// Unutar tvoje funkcije updateBuses, tamo gdje stvaraš popup:
-function updateBuses() {
-    fetch('/api/buses').then(res => res.json()).then(data => {
-        (data.vehicles || []).forEach(bus => {
-            
-            // Definiranje izgleda prozorčića s podacima s Fleeta
-            var popupContent = `
-                <div style="min-width: 200px;">
-                    <b>Linija ${bus.name}</b> (Gbr: ${bus.garageNumber})<br>
-                    <hr>
-                    <b>Relacija:</b> ${bus.origin || 'Učitavanje...'} ➔ ${bus.destination || 'Učitavanje...'}<br>
-                    <b>Krenuo:</b> ${bus.departureTime || 'Nepoznato'}<br>
-                    <b>Brzina:</b> ${bus.speed || '0'} km/h<br>
-                    <b>Sljedeća stanica:</b> ${bus.nextStopName || 'Provjera...'}
-                </div>
-            `;
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Promet Split Live</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map { height: 100vh; width: 100%; }
+        body { margin: 0; padding: 0; }
+        .bus-marker { border-radius: 4px; border: 1.5px solid #222; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
+        .line-section { background: #ffffff; height: 40%; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #ddd; }
+        .line-text { color: #ff7f00; font-size: 11px; font-weight: 900; }
+        .garage-section { background: #ffcc00; height: 60%; display: flex; align-items: center; justify-content: center; }
+        .garage-text { color: #ffffff; font-size: 14px; font-weight: 900; text-shadow: 1px 1px 1px rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([43.5147, 16.4435], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        var markers = {};
 
-            if (markers[bus.id]) {
-                markers[bus.id].setLatLng([bus.latitude, bus.longitude]).setPopupContent(popupContent);
-            } else {
-                // Stvaranje novog markera ako ne postoji
-                markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: tvojaIkona})
-                    .addTo(map).bindPopup(popupContent);
-                
-                // Na klik povuci detaljnu trasu i stanice
-                markers[bus.id].on('click', () => {
-                    if(bus.tripId) {
-                        fetch(`/api/trip_details/${bus.tripId}`)
-                            .then(res => res.json())
-                            .then(tripData => {
-                                console.log("Detalji rute učitani za gbr:", bus.garageNumber);
-                                // Ovdje možeš dodati crtanje stanica na mapu
-                            });
+        function updateBuses() {
+            fetch('/api/buses').then(res => res.json()).then(data => {
+                (data.vehicles || []).forEach(bus => {
+                    var lineNum = bus.name.toString().replace(/\D/g, "");
+                    var iconHtml = `<div class="bus-marker">
+                        <div class="line-section"><span class="line-text">${lineNum}</span></div>
+                        <div class="garage-section"><span class="garage-text">${bus.garageNumber}</span></div>
+                    </div>`;
+                    var icon = L.divIcon({ html: iconHtml, className: '', iconSize: [45, 35], iconAnchor: [22, 17] });
+
+                    var popupContent = `
+                        <div style="min-width: 200px;">
+                            <b>Linija ${bus.name}</b> (Gbr: ${bus.garageNumber})<br><hr>
+                            <b>Relacija:</b> ${bus.origin || 'Kružna'} ➔ ${bus.destination || 'Kružna'}<br>
+                            <b>Brzina:</b> ${bus.speed || '0'} km/h<br>
+                            <b>Sljedeća:</b> ${bus.nextStopName || 'Nema info'}
+                        </div>`;
+
+                    if (markers[bus.id]) {
+                        markers[bus.id].setLatLng([bus.latitude, bus.longitude]).setPopupContent(popupContent);
+                    } else {
+                        markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon})
+                            .addTo(map).bindPopup(popupContent);
                     }
                 });
-            }
-        });
-    });
-}
+            });
+        }
+        setInterval(updateBuses, 5000);
+        updateBuses();
+    </script>
+</body>
+</html>
