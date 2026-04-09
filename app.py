@@ -1,12 +1,12 @@
 import os
 import sqlite3
-from flask import Flask, render_template, jsonify
 import requests
+from flask import Flask, render_template, jsonify
 from datetime import datetime
 
 app = Flask(__name__)
 
-# Kreiranje baze podataka za povijest ako ne postoji
+# Inicijalizacija baze podataka za praćenje povijesti
 def init_db():
     conn = sqlite3.connect('bus_history.db')
     c = conn.cursor()
@@ -26,36 +26,54 @@ def index():
 @app.route('/api/buses')
 def get_buses():
     url = "https://www.bus-split.com/api/vehicles/live"
-    headers = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://fleet.promet-split.hr/'}
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Referer': 'https://fleet.promet-split.hr/'
+    }
     try:
         r = requests.get(url, headers=headers, timeout=10)
         data = r.json()
         
-        # LOGIRANJE: Spremi trenutno stanje svakog busa u bazu
+        # Logiranje u bazu podataka
         conn = sqlite3.connect('bus_history.db')
         c = conn.cursor()
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now().strftime("%H:%M:%S")
         
         for bus in data.get("vehicles", []):
-            line_num = str(bus.get("name", "")).replace("Linija ", "")
+            gbr = bus.get("garageNumber")
+            line = str(bus.get("name", "")).replace("Linija ", "")
+            reg = bus.get("registrationNumber")
+            lat = bus.get("latitude")
+            lon = bus.get("longitude")
+            
+            # Spremi u bazu
             c.execute("INSERT INTO logs (garage_num, line, reg, time, lat, lon) VALUES (?, ?, ?, ?, ?, ?)",
-                      (bus.get("garageNumber"), line_num, bus.get("registrationNumber"), now, bus.get("latitude"), bus.get("longitude")))
+                      (gbr, line, reg, now, lat, lon))
         
         conn.commit()
         conn.close()
         return jsonify(data)
-    except Exception as e:
+    except:
         return jsonify({"vehicles": []})
 
-# NOVO: Ruta za pregled povijesti određenog busa
 @app.route('/api/history/<garage_num>')
 def get_history(garage_num):
     conn = sqlite3.connect('bus_history.db')
     c = conn.cursor()
-    c.execute("SELECT line, time FROM logs WHERE garage_num = ? ORDER BY time DESC LIMIT 50", (garage_num,))
+    # Dohvaća zadnjih 100 zapisa za taj bus
+    c.execute("SELECT line, time, reg FROM logs WHERE garage_num = ? ORDER BY id DESC LIMIT 100", (garage_num,))
     rows = c.fetchall()
     conn.close()
-    return jsonify([{"line": r[0], "time": r[1]} for r in row])
+    
+    history = []
+    last_line = ""
+    for r in rows:
+        # Prikazujemo samo kad bus promijeni liniju da ne bude pretrpano
+        if r[0] != last_line:
+            history.append({"line": r[0], "time": r[1], "reg": r[2]})
+            last_line = r[0]
+            
+    return jsonify(history)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
