@@ -6,14 +6,13 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# Inicijalizacija baze podataka za praćenje povijesti
 def init_db():
     conn = sqlite3.connect('bus_history.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS logs 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                   garage_num TEXT, line TEXT, reg TEXT, 
-                  time TEXT, lat REAL, lon REAL)''')
+                  date TEXT, time TEXT, lat REAL, lon REAL)''')
     conn.commit()
     conn.close()
 
@@ -26,29 +25,22 @@ def index():
 @app.route('/api/buses')
 def get_buses():
     url = "https://www.bus-split.com/api/vehicles/live"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-        'Referer': 'https://fleet.promet-split.hr/'
-    }
+    headers = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://fleet.promet-split.hr/'}
     try:
         r = requests.get(url, headers=headers, timeout=10)
         data = r.json()
         
-        # Logiranje u bazu podataka
-        conn = sqlite3.connect('bus_history.db')
+        conn = sqlite3.connect('bus_history.db', timeout=10)
         c = conn.cursor()
-        now = datetime.now().strftime("%H:%M:%S")
+        now_date = datetime.now().strftime("%d.%m.%Y.")
+        now_time = datetime.now().strftime("%H:%M")
         
         for bus in data.get("vehicles", []):
             gbr = bus.get("garageNumber")
             line = str(bus.get("name", "")).replace("Linija ", "")
             reg = bus.get("registrationNumber")
-            lat = bus.get("latitude")
-            lon = bus.get("longitude")
-            
-            # Spremi u bazu
-            c.execute("INSERT INTO logs (garage_num, line, reg, time, lat, lon) VALUES (?, ?, ?, ?, ?, ?)",
-                      (gbr, line, reg, now, lat, lon))
+            c.execute("INSERT INTO logs (garage_num, line, reg, date, time, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                      (gbr, line, reg, now_date, now_time, bus.get("latitude"), bus.get("longitude")))
         
         conn.commit()
         conn.close()
@@ -56,21 +48,21 @@ def get_buses():
     except:
         return jsonify({"vehicles": []})
 
-@app.route('/api/history/<garage_num>')
-def get_history(garage_num):
+@app.route('/api/full_history/<garage_num>')
+def get_full_history(garage_num):
     conn = sqlite3.connect('bus_history.db')
     c = conn.cursor()
-    # Dohvaća zadnjih 100 zapisa za taj bus
-    c.execute("SELECT line, time, reg FROM logs WHERE garage_num = ? ORDER BY id DESC LIMIT 100", (garage_num,))
+    # Dohvaća apsolutno sve zapise za taj gbr kroz sve dane
+    c.execute("SELECT line, date, time, reg FROM logs WHERE garage_num = ? ORDER BY id DESC", (garage_num,))
     rows = c.fetchall()
     conn.close()
     
     history = []
     last_line = ""
     for r in rows:
-        # Prikazujemo samo kad bus promijeni liniju da ne bude pretrpano
+        # Prikazujemo samo promjene linija da lista ne bude kilometarska
         if r[0] != last_line:
-            history.append({"line": r[0], "time": r[1], "reg": r[2]})
+            history.append({"line": r[0], "date": r[1], "time": r[2], "reg": r[3]})
             last_line = r[0]
             
     return jsonify(history)
