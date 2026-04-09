@@ -1,57 +1,30 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Promet Split Live</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        #map { height: 100vh; width: 100%; }
-        body { margin: 0; padding: 0; }
-        .bus-marker { border-radius: 4px; border: 1.5px solid #222; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
-        .line-section { background: #ffffff; height: 40%; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #ddd; }
-        .line-text { color: #ff7f00; font-size: 11px; font-weight: 900; }
-        .garage-section { background: #ffcc00; height: 60%; display: flex; align-items: center; justify-content: center; }
-        .garage-text { color: #ffffff; font-size: 14px; font-weight: 900; text-shadow: 1px 1px 1px rgba(0,0,0,0.5); }
-    </style>
-</head>
-<body>
-    <div id="map"></div>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        var map = L.map('map').setView([43.5147, 16.4435], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        var markers = {};
+// Unutar updateBuses funkcije, promijeni popup dio:
 
-        function updateBuses() {
-            fetch('/api/buses').then(res => res.json()).then(data => {
-                (data.vehicles || []).forEach(bus => {
-                    var lineNum = bus.name.toString().replace(/\D/g, "");
-                    var iconHtml = `<div class="bus-marker">
-                        <div class="line-section"><span class="line-text">${lineNum}</span></div>
-                        <div class="garage-section"><span class="garage-text">${bus.garageNumber}</span></div>
-                    </div>`;
-                    var icon = L.divIcon({ html: iconHtml, className: '', iconSize: [45, 35], iconAnchor: [22, 17] });
+var popupContent = `
+    <div style="min-width: 150px; font-family: sans-serif;">
+        <b style="font-size: 16px; color: #ff7f00;">Linija ${lineNum}</b><br>
+        <b style="font-size: 14px;">Gbr: ${bus.garageNumber}</b><br>
+        <span style="color: #666;">Reg: ${bus.registrationNumber}</span><br>
+        <hr style="margin: 5px 0; border: 0; border-top: 1px solid #eee;">
+        <button onclick="viewHistory('${bus.garageNumber}')" style="width: 100%; cursor: pointer;">Prikaži povijest linija</button>
+        <div id="hist-${bus.garageNumber}" style="font-size: 11px; margin-top: 5px; max-height: 80px; overflow-y: auto;"></div>
+    </div>
+`;
 
-                    var popupContent = `
-                        <div style="min-width: 200px;">
-                            <b>Linija ${bus.name}</b> (Gbr: ${bus.garageNumber})<br><hr>
-                            <b>Relacija:</b> ${bus.origin || 'Kružna'} ➔ ${bus.destination || 'Kružna'}<br>
-                            <b>Brzina:</b> ${bus.speed || '0'} km/h<br>
-                            <b>Sljedeća:</b> ${bus.nextStopName || 'Nema info'}
-                        </div>`;
-
-                    if (markers[bus.id]) {
-                        markers[bus.id].setLatLng([bus.latitude, bus.longitude]).setPopupContent(popupContent);
-                    } else {
-                        markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon})
-                            .addTo(map).bindPopup(popupContent);
-                    }
-                });
+// Funkcija za prikaz gdje je bus sve bio
+function viewHistory(gbr) {
+    fetch(`/api/history/${gbr}`)
+        .then(res => res.json())
+        .then(data => {
+            let html = "<b>Zadnje rute:</b><br>";
+            // Filtriramo samo promjene linija da ne piše istu liniju 100 puta
+            let lastLine = "";
+            data.forEach(entry => {
+                if(entry.line !== lastLine) {
+                    html += `${entry.time.split(' ')[1]} - Linija ${entry.line}<br>`;
+                    lastLine = entry.line;
+                }
             });
-        }
-        setInterval(updateBuses, 5000);
-        updateBuses();
-    </script>
-</body>
-</html>
+            document.getElementById(`hist-${gbr}`).innerHTML = html;
+        });
+}
