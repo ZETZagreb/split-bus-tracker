@@ -7,36 +7,13 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 100vh; width: 100%; }
-        body { margin: 0; padding: 0; font-family: 'Arial', sans-serif; }
-        
-        #search-box {
-            position: absolute; top: 15px; left: 55px; z-index: 1000;
-            background: white; padding: 8px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-        }
+        body { margin: 0; padding: 0; font-family: sans-serif; }
+        #search-box { position: absolute; top: 15px; left: 55px; z-index: 1000; background: white; padding: 8px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
         #bus-search { border: none; outline: none; padding: 5px; width: 150px; font-weight: bold; }
-
-        /* PRAVOKUTNI BUS DIZAJN */
-        .bus-marker {
-            border-radius: 4px;
-            border: 1.5px solid #222;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            box-shadow: 2px 4px 6px rgba(0,0,0,0.4);
-            background: #fff;
-        }
-
-        .line-section {
-            background: #ffffff; height: 38%;
-            display: flex; align-items: center; justify-content: center;
-            border-bottom: 1px solid #ddd;
-        }
+        .bus-marker { border-radius: 4px; border: 1.5px solid #222; display: flex; flex-direction: column; overflow: hidden; box-shadow: 2px 4px 6px rgba(0,0,0,0.4); background: #fff; }
+        .line-section { background: #ffffff; height: 38%; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #ddd; }
         .line-text { color: #ff7f00; font-size: 10px; font-weight: 800; }
-
-        .garage-section {
-            background: #ffcc00; height: 62%;
-            display: flex; align-items: center; justify-content: center;
-        }
+        .garage-section { background: #ffcc00; height: 62%; display: flex; align-items: center; justify-content: center; }
         .garage-text { color: #ffffff; font-size: 14px; font-weight: 900; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); }
     </style>
 </head>
@@ -50,58 +27,58 @@
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
         var markers = {};
-        var busData = [];
+        var stopMarkers = [];
+        var activeRoute = null;
 
-        function updateBuses() {
-            fetch('/api/buses')
+        // FUNKCIJA KOJA SLOŽI SVE LINIJE AUTOMATSKI
+        function drawAnyRoute(lineId) {
+            if(activeRoute) map.removeLayer(activeRoute);
+            stopMarkers.forEach(m => map.removeLayer(m));
+            stopMarkers = [];
+
+            // Pitamo naš server za stanice te linije
+            fetch(`/api/route_details/${lineId}`)
                 .then(res => res.json())
                 .then(data => {
-                    busData = data.vehicles || [];
-                    busData.forEach(bus => {
-                        var lineDisplay = bus.name.toString().replace("Linija ", "").trim();
-                        
-                        var iconHtml = `
-                            <div class="bus-marker">
-                                <div class="line-section"><span class="line-text">${lineDisplay}</span></div>
-                                <div class="garage-section"><span class="garage-text">${bus.garageNumber}</span></div>
-                            </div>`;
-                        
-                        var icon = L.divIcon({ html: iconHtml, className: '', iconSize: [45, 35], iconAnchor: [22, 17] });
-
-                        // NOVO: Relacija i vrijeme polaska
-                        var relacija = (bus.origin && bus.destination) ? `${bus.origin} ➔ ${bus.destination}` : "Nije dostupno";
-                        var kretanje = bus.departureTime ? bus.departureTime : "Nepoznato";
-
-                        var popupContent = `
-                            <div style="font-family: sans-serif; line-height: 1.4;">
-                                <b>Linija ${bus.name}</b> (Gbr: ${bus.garageNumber})<br>
-                                <hr style="margin: 5px 0; border: 0; border-top: 1px solid #eee;">
-                                <b>Relacija:</b> ${relacija}<br>
-                                <b>Krenuo u:</b> ${kretanje}<br>
-                                <b>Registracija:</b> ${bus.registrationNumber || '---'}
-                            </div>
-                        `;
-
-                        if (markers[bus.id]) {
-                            markers[bus.id].setLatLng([bus.latitude, bus.longitude]);
-                            markers[bus.id].getPopup().setContent(popupContent);
-                        } else {
-                            markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon, zIndexOffset: 1000})
-                                .addTo(map)
-                                .bindPopup(popupContent);
-                        }
-                    });
+                    if(data.stops && data.stops.length > 0) {
+                        var coords = [];
+                        data.stops.forEach(s => {
+                            coords.push([s.lat, s.lon]);
+                            var sm = L.circleMarker([s.lat, s.lon], { radius: 6, fillColor: "#ffcc00", color: "#000", weight: 2, fillOpacity: 1 })
+                                     .addTo(map).bindPopup(`<b>Stanica:</b> ${s.name}`);
+                            stopMarkers.push(sm);
+                        });
+                        activeRoute = L.polyline(coords, {color: '#007bff', weight: 6, opacity: 0.8}).addTo(map);
+                    }
                 });
         }
 
-        document.getElementById('bus-search').addEventListener('input', (e) => {
-            var val = e.target.value;
-            var found = busData.find(b => b.garageNumber == val);
-            if(found && markers[found.id]) {
-                map.setView([found.latitude, found.longitude], 16);
-                markers[found.id].openPopup();
-            }
-        });
+        function updateBuses() {
+            fetch('/api/buses').then(res => res.json()).then(data => {
+                (data.vehicles || []).forEach(bus => {
+                    var lineNum = bus.name.replace(/\D/g, "");
+                    var iconHtml = `<div class="bus-marker">
+                        <div class="line-section"><span class="line-text">${lineNum}</span></div>
+                        <div class="garage-section"><span class="garage-text">${bus.garageNumber}</span></div>
+                    </div>`;
+                    var icon = L.divIcon({ html: iconHtml, className: '', iconSize: [45, 35], iconAnchor: [22, 17] });
+                    
+                    var popup = `<b>Linija ${bus.name}</b><br><hr>
+                                 <b>Smjer:</b> ${bus.origin || 'Učitavanje...'} ➔ ${bus.destination || 'Učitavanje...'}<br>
+                                 <b>Krenuo u:</b> ${bus.departureTime || 'Nepoznato'}<br>
+                                 <b>Gbr:</b> ${bus.garageNumber}<br>
+                                 <b>Reg:</b> ${bus.registrationNumber}`;
+
+                    if (markers[bus.id]) {
+                        markers[bus.id].setLatLng([bus.latitude, bus.longitude]).setPopupContent(popup);
+                    } else {
+                        // Koristimo bus.lineId (ili slično) da dohvatimo trasu
+                        markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon})
+                            .addTo(map).bindPopup(popup).on('click', () => drawAnyRoute(bus.lineId || lineNum));
+                    }
+                });
+            });
+        }
 
         setInterval(updateBuses, 5000);
         updateBuses();
