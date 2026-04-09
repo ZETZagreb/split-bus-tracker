@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Promet Split - Arhiva i Live</title>
+    <title>Promet Split - Arhiva Vozila</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -9,69 +9,99 @@
         #map { height: 100vh; width: 100%; }
         body { margin: 0; padding: 0; font-family: sans-serif; }
         
-        /* Dizajn žutih cigli */
-        .bus-marker { border-radius: 4px; border: 1.5px solid #222; display: flex; flex-direction: column; overflow: hidden; background: #fff; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); }
+        #search-container { position: absolute; top: 15px; left: 55px; z-index: 1000; background: white; padding: 12px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 220px; }
+        #bus-search { border: 1px solid #ccc; padding: 8px; width: 100%; border-radius: 4px; font-weight: bold; box-sizing: border-box; }
+        #search-results { margin-top: 10px; max-height: 300px; overflow-y: auto; display: none; background: #f9f9f9; border-radius: 4px; padding: 5px; font-size: 12px; }
+
+        .bus-marker { border-radius: 4px; border: 1.5px solid #222; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
         .line-section { background: #ffffff; height: 40%; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #ddd; }
         .line-text { color: #ff7f00; font-size: 11px; font-weight: 900; }
         .garage-section { background: #ffcc00; height: 60%; display: flex; align-items: center; justify-content: center; }
         .garage-text { color: #ffffff; font-size: 14px; font-weight: 900; text-shadow: 1px 1px 1px rgba(0,0,0,0.5); }
         
-        .hist-box { max-height: 120px; overflow-y: auto; font-size: 11px; margin-top: 8px; border-top: 1px solid #eee; padding-top: 5px; }
-        .hist-item { padding: 2px 0; border-bottom: 1px solid #f9f9f9; }
+        .hist-item { padding: 5px; border-bottom: 1px solid #ddd; }
+        .hist-item b { color: #ff7f00; }
     </style>
 </head>
 <body>
+    <div id="search-container">
+        <input type="text" id="bus-search" placeholder="Traži Gbr (npr. 030)...">
+        <div id="search-results"></div>
+    </div>
     <div id="map"></div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = L.map('map').setView([43.5147, 16.4435], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        
         var markers = {};
+        var liveBuses = [];
 
-        function viewHistory(gbr) {
-            fetch(`/api/history/${gbr}`)
+        function searchBus() {
+            var gbr = document.getElementById('bus-search').value;
+            var resultsDiv = document.getElementById('search-results');
+            
+            if (gbr.length < 2) {
+                resultsDiv.style.display = 'none';
+                return;
+            }
+
+            // 1. Provjeri je li bus trenutno aktivan
+            var active = liveBuses.find(b => b.garageNumber == gbr);
+            if (active) {
+                map.setView([active.latitude, active.longitude], 17);
+                markers[active.id].openPopup();
+            }
+
+            // 2. Uvijek povuci povijest iz baze (čak i ako ne vozi)
+            fetch(`/api/full_history/${gbr}`)
                 .then(res => res.json())
                 .then(data => {
-                    let html = "<b>Povijest linija danas:</b><br>";
-                    data.forEach(h => {
-                        html += `<div class="hist-item">🕒 ${h.time} - <b>Linija ${h.line}</b></div>`;
-                    });
-                    document.getElementById('hist-content-' + gbr).innerHTML = html;
+                    resultsDiv.style.display = 'block';
+                    if (data.length === 0) {
+                        resultsDiv.innerHTML = "Nema zapisa u bazi za ovaj Gbr.";
+                    } else {
+                        let html = `<b>Povijest za Gbr ${gbr}:</b><br>`;
+                        data.forEach(h => {
+                            html += `<div class="hist-item">
+                                        📅 ${h.date} u ${h.time}<br>
+                                        <b>Linija ${h.line}</b> (${h.reg})
+                                     </div>`;
+                        });
+                        resultsDiv.innerHTML = html;
+                    }
                 });
         }
 
         function updateBuses() {
             fetch('/api/buses').then(res => res.json()).then(data => {
-                (data.vehicles || []).forEach(bus => {
+                liveBuses = data.vehicles || [];
+                liveBuses.forEach(bus => {
                     var lineNum = bus.name.toString().replace(/\D/g, "");
                     var gbr = bus.garageNumber;
                     
-                    var iconHtml = `
-                        <div class="bus-marker">
-                            <div class="line-section"><span class="line-text">${lineNum}</span></div>
-                            <div class="garage-section"><span class="garage-text">${gbr}</span></div>
-                        </div>`;
+                    var iconHtml = `<div class="bus-marker">
+                        <div class="line-section"><span class="line-text">${lineNum}</span></div>
+                        <div class="garage-section"><span class="garage-text">${gbr}</span></div>
+                    </div>`;
                     
                     var icon = L.divIcon({ html: iconHtml, className: '', iconSize: [45, 35], iconAnchor: [22, 17] });
-
-                    var popupContent = `
-                        <div style="min-width: 160px;">
-                            <b style="font-size: 15px;">Linija ${lineNum}</b><br>
-                            <b>Gbr:</b> ${gbr}<br>
-                            <b>Reg:</b> ${bus.registrationNumber}<br>
-                            <button onclick="viewHistory('${gbr}')" style="margin-top:8px; width:100%; cursor:pointer;">Prikaži kretanje</button>
-                            <div class="hist-box" id="hist-content-${gbr}">Klikni za učitavanje povijesti...</div>
-                        </div>`;
+                    var popup = `<b>Linija ${lineNum}</b><br>Gbr: ${gbr}<br>Reg: ${bus.registrationNumber}`;
 
                     if (markers[bus.id]) {
-                        markers[bus.id].setLatLng([bus.latitude, bus.longitude]).setPopupContent(popupContent);
+                        markers[bus.id].setLatLng([bus.latitude, bus.longitude]).setPopupContent(popup);
                     } else {
                         markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon})
-                            .addTo(map).bindPopup(popupContent);
+                            .addTo(map).bindPopup(popup);
                     }
                 });
             });
         }
+
+        document.getElementById('bus-search').addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') searchBus();
+        });
 
         setInterval(updateBuses, 5000);
         updateBuses();
