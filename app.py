@@ -6,7 +6,7 @@ from supabase import create_client, Client
 
 app = Flask(__name__)
 
-# Postavke baze podataka
+# Tvoji podaci povezani s bazom
 SUPABASE_URL = "https://ohxghzlbdflyqjatcwcb.supabase.co"
 SUPABASE_KEY = "sb_publishable_hBKMq44_LWLCjlO_PfKQ9Q_yB-mZVDO"
 
@@ -32,19 +32,22 @@ def get_buses():
         
         vehicles = data.get("vehicles", [])
         for bus in vehicles:
-            supabase.table("bus_logs").insert({
-                "garage_num": str(bus.get("garageNumber")),
-                "line": str(bus.get("name", "")).replace("Linija ", ""),
-                "reg": str(bus.get("registrationNumber")),
-                "date": now_date,
-                "time": now_time,
-                "lat": bus.get("latitude"),
-                "lon": bus.get("longitude")
-            }).execute()
+            # Spremanje svakog autobusa u Supabase bazu
+            try:
+                supabase.table("bus_logs").insert({
+                    "garage_num": str(bus.get("garageNumber")),
+                    "line": str(bus.get("name", "")).replace("Linija ", ""),
+                    "reg": str(bus.get("registrationNumber")),
+                    "date": now_date,
+                    "time": now_time,
+                    "lat": bus.get("latitude"),
+                    "lon": bus.get("longitude")
+                }).execute()
+            except:
+                pass
             
         return jsonify(data)
     except Exception as e:
-        print(f"Error: {e}")
         return jsonify({"vehicles": []})
 
 @app.route('/api/full_history/<garage_num>')
