@@ -1,22 +1,16 @@
 import os
-import sqlite3
 import requests
 from flask import Flask, render_template, jsonify
 from datetime import datetime
+from supabase import create_client, Client
 
 app = Flask(__name__)
 
-def init_db():
-    conn = sqlite3.connect('bus_history.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS logs 
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                  garage_num TEXT, line TEXT, reg TEXT, 
-                  date TEXT, time TEXT, lat REAL, lon REAL)''')
-    conn.commit()
-    conn.close()
-
-init_db()
+# TVOJI PODACI SA SLIKE
+SUPABASE_URL = "https://ohxghzlbdflyqjatcwcb.supabase.co"
+# Supabase KEY pronađi u Settings -> API (traži 'anon' public key)
+SUPABASE_KEY = "OVDJE_ZALIJEPI_SVOJ_ANON_KEY"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 @app.route('/')
 def index():
@@ -30,42 +24,47 @@ def get_buses():
         r = requests.get(url, headers=headers, timeout=10)
         data = r.json()
         
-        conn = sqlite3.connect('bus_history.db', timeout=10)
-        c = conn.cursor()
         now_date = datetime.now().strftime("%d.%m.%Y.")
         now_time = datetime.now().strftime("%H:%M")
         
-        for bus in data.get("vehicles", []):
-            gbr = bus.get("garageNumber")
-            line = str(bus.get("name", "")).replace("Linija ", "")
-            reg = bus.get("registrationNumber")
-            c.execute("INSERT INTO logs (garage_num, line, reg, date, time, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                      (gbr, line, reg, now_date, now_time, bus.get("latitude"), bus.get("longitude")))
-        
-        conn.commit()
-        conn.close()
+        vehicles = data.get("vehicles", [])
+        for bus in vehicles:
+            # Spremanje svakog busa u trajnu Supabase bazu
+            supabase.table("bus_logs").insert({
+                "garage_num": str(bus.get("garageNumber")),
+                "line": str(bus.get("name", "")).replace("Linija ", ""),
+                "reg": str(bus.get("registrationNumber")),
+                "date": now_date,
+                "time": now_time,
+                "lat": bus.get("latitude"),
+                "lon": bus.get("longitude")
+            }).execute()
+            
         return jsonify(data)
-    except:
+    except Exception as e:
+        print(f"Greška: {e}")
         return jsonify({"vehicles": []})
 
 @app.route('/api/full_history/<garage_num>')
 def get_full_history(garage_num):
-    conn = sqlite3.connect('bus_history.db')
-    c = conn.cursor()
-    # Dohvaća apsolutno sve zapise za taj gbr kroz sve dane
-    c.execute("SELECT line, date, time, reg FROM logs WHERE garage_num = ? ORDER BY id DESC", (garage_num,))
-    rows = c.fetchall()
-    conn.close()
-    
-    history = []
-    last_line = ""
-    for r in rows:
-        # Prikazujemo samo promjene linija da lista ne bude kilometarska
-        if r[0] != last_line:
-            history.append({"line": r[0], "date": r[1], "time": r[2], "reg": r[3]})
-            last_line = r[0]
-            
-    return jsonify(history)
+    # Dohvaćanje cijele povijesti kretanja za određeni garažni broj
+    try:
+        response = supabase.table("bus_logs") \
+            .select("line, date, time, reg") \
+            .eq("garage_num", garage_num) \
+            .order("id", desc=True) \
+            .limit(200) \
+            .execute()
+        
+        history = []
+        last_line = ""
+        for r in response.data:
+            if r['line'] != last_line:
+                history.append(r)
+                last_line = r['line']
+        return jsonify(history)
+    except:
+        return jsonify([])
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
