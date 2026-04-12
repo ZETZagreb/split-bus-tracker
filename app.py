@@ -6,10 +6,10 @@ from supabase import create_client, Client
 
 app = Flask(__name__)
 
-# TVOJI PODACI SA SLIKE
+# Postavke baze podataka
 SUPABASE_URL = "https://ohxghzlbdflyqjatcwcb.supabase.co"
-# Supabase KEY pronađi u Settings -> API (traži 'anon' public key)
-SUPABASE_KEY = "OVDJE_ZALIJEPI_SVOJ_ANON_KEY"
+SUPABASE_KEY = "sb_publishable_hBKMq44_LWLCjlO_PfKQ9Q_yB-mZVDO"
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 @app.route('/')
@@ -19,7 +19,10 @@ def index():
 @app.route('/api/buses')
 def get_buses():
     url = "https://www.bus-split.com/api/vehicles/live"
-    headers = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://fleet.promet-split.hr/'}
+    headers = {
+        'User-Agent': 'Mozilla/5.0',
+        'Referer': 'https://fleet.promet-split.hr/'
+    }
     try:
         r = requests.get(url, headers=headers, timeout=10)
         data = r.json()
@@ -29,7 +32,6 @@ def get_buses():
         
         vehicles = data.get("vehicles", [])
         for bus in vehicles:
-            # Spremanje svakog busa u trajnu Supabase bazu
             supabase.table("bus_logs").insert({
                 "garage_num": str(bus.get("garageNumber")),
                 "line": str(bus.get("name", "")).replace("Linija ", ""),
@@ -42,12 +44,11 @@ def get_buses():
             
         return jsonify(data)
     except Exception as e:
-        print(f"Greška: {e}")
+        print(f"Error: {e}")
         return jsonify({"vehicles": []})
 
 @app.route('/api/full_history/<garage_num>')
 def get_full_history(garage_num):
-    # Dohvaćanje cijele povijesti kretanja za određeni garažni broj
     try:
         response = supabase.table("bus_logs") \
             .select("line, date, time, reg") \
