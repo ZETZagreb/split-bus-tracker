@@ -4,12 +4,11 @@ from flask import Flask, render_template, jsonify
 from datetime import datetime
 from supabase import create_client, Client
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 
-# Tvoji podaci povezani s bazom
+# Supabase podaci
 SUPABASE_URL = "https://ohxghzlbdflyqjatcwcb.supabase.co"
 SUPABASE_KEY = "sb_publishable_hBKMq44_LWLCjlO_PfKQ9Q_yB-mZVDO"
-
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 @app.route('/')
@@ -19,20 +18,16 @@ def index():
 @app.route('/api/buses')
 def get_buses():
     url = "https://www.bus-split.com/api/vehicles/live"
-    headers = {
-        'User-Agent': 'Mozilla/5.0',
-        'Referer': 'https://fleet.promet-split.hr/'
-    }
+    headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         r = requests.get(url, headers=headers, timeout=10)
         data = r.json()
+        vehicles = data.get("vehicles", [])
         
         now_date = datetime.now().strftime("%d.%m.%Y.")
         now_time = datetime.now().strftime("%H:%M")
         
-        vehicles = data.get("vehicles", [])
         for bus in vehicles:
-            # Spremanje svakog autobusa u Supabase bazu
             try:
                 supabase.table("bus_logs").insert({
                     "garage_num": str(bus.get("garageNumber")),
@@ -44,11 +39,11 @@ def get_buses():
                     "lon": bus.get("longitude")
                 }).execute()
             except:
-                pass
-            
+                continue
+                
         return jsonify(data)
     except Exception as e:
-        return jsonify({"vehicles": []})
+        return jsonify({"vehicles": [], "error": str(e)})
 
 @app.route('/api/full_history/<garage_num>')
 def get_full_history(garage_num):
@@ -57,7 +52,7 @@ def get_full_history(garage_num):
             .select("line, date, time, reg") \
             .eq("garage_num", garage_num) \
             .order("id", desc=True) \
-            .limit(200) \
+            .limit(100) \
             .execute()
         
         history = []
@@ -71,5 +66,4 @@ def get_full_history(garage_num):
         return jsonify([])
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
