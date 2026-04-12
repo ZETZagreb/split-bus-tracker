@@ -16,7 +16,7 @@ def index():
 
 @app.route('/api/buses')
 def get_buses():
-    # Koristimo API koji napaja njihovu Fleet mapu
+    # Službeni Fleet API
     url = "https://fleet.promet-split.hr/api/v1/vehicles"
     headers = {
         'User-Agent': 'Mozilla/5.0',
@@ -24,38 +24,44 @@ def get_buses():
     }
     try:
         r = requests.get(url, headers=headers, timeout=10)
-        vehicles = r.json()
+        fleet_data = r.json()
         
+        # Pretvaramo Fleet format u tvoj format za mapu
+        formatted_vehicles = []
         now_date = datetime.now().strftime("%d.%m.%Y.")
         now_time = datetime.now().strftime("%H:%M")
         
-        for bus in vehicles:
-            # Fleet API obično koristi 'lineCode' ili 'route'
-            line = str(bus.get("lineCode") or bus.get("lineName") or "N/A")
-            gbr = str(bus.get("garageNumber") or bus.get("id"))
-            
-            # Ključna polja koja tražiš (ovako ih šalje Fleet sustav)
-            direction = bus.get("destination") or bus.get("direction") or "Čeka polazak"
-            sch_dep = bus.get("departureTime") or bus.get("scheduledTime") or "---"
-            t_id = bus.get("tripId") or "N/A"
+        for bus in fleet_data:
+            # Fleet koristi 'lat'/'lon' i 'garageNumber'
+            v = {
+                "garageNumber": str(bus.get("garageNumber", "")),
+                "latitude": bus.get("lat"),
+                "longitude": bus.get("lon"),
+                "registrationNumber": bus.get("plateNumber", "N/A"),
+                "name": str(bus.get("lineCode", "N/A")),
+                "destinationName": bus.get("destination", "U prometu"),
+                "scheduledDeparture": bus.get("departureTime", "---")
+            }
+            formatted_vehicles.append(v)
 
+            # SPREMANJE U SUPABASE
             try:
                 supabase.table("bus_logs").insert({
-                    "garage_num": gbr,
-                    "line": line,
-                    "reg": str(bus.get("plateNumber") or bus.get("registration")),
+                    "garage_num": v["garageNumber"],
+                    "line": v["name"],
+                    "reg": v["registrationNumber"],
                     "date": now_date,
                     "time": now_time,
-                    "lat": bus.get("latitude"),
-                    "lon": bus.get("longitude"),
-                    "trip_id": str(t_id),
-                    "scheduled_departure_time": str(sch_dep),
-                    "direction": str(direction)
+                    "lat": v["latitude"],
+                    "lon": v["longitude"],
+                    "trip_id": str(bus.get("tripId", "N/A")),
+                    "scheduled_departure_time": str(v["scheduledDeparture"]),
+                    "direction": str(v["destinationName"])
                 }).execute()
             except:
                 continue
                 
-        return jsonify({"vehicles": vehicles})
+        return jsonify({"vehicles": formatted_vehicles})
     except Exception as e:
         return jsonify({"vehicles": [], "error": str(e)})
 
