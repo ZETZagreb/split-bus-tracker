@@ -27,7 +27,7 @@ def get_buses():
         
         for bus in vehicles:
             line_clean = str(bus.get("name", "")).replace("Linija ", "").strip()
-            trip_id = bus.get("tripId") or bus.get("blockId") or "Nije prijavljen"
+            trip_id = bus.get("tripId") or bus.get("blockId") or "N/A"
             sch_dep = bus.get("scheduledDeparture") or "---"
             direction = bus.get("destinationName") or "U prometu"
 
@@ -46,18 +46,9 @@ def get_buses():
                 }).execute()
             except:
                 continue
-                
         return jsonify(data)
     except Exception as e:
         return jsonify({"vehicles": [], "error": str(e)})
-
-@app.route('/api/full_history/<garage_num>')
-def get_full_history(garage_num):
-    try:
-        res = supabase.table("bus_logs").select("*").eq("garage_num", garage_num).order("id", desc=True).limit(100).execute()
-        return jsonify(res.data)
-    except:
-        return jsonify([])
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
