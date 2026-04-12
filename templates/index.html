@@ -1,109 +1,68 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Promet Split - Arhiva 24/7</title>
+    <title>Promet Split Arhiva</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 100vh; width: 100%; }
         body { margin: 0; padding: 0; font-family: sans-serif; }
-        
-        /* Tražilica */
-        #search-container { 
-            position: absolute; top: 15px; left: 55px; z-index: 1000; 
-            background: white; padding: 12px; border-radius: 8px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 230px; 
-        }
+        #search-container { position: absolute; top: 15px; left: 55px; z-index: 1000; background: white; padding: 12px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 230px; }
         #bus-search { border: 1px solid #ccc; padding: 8px; width: 100%; border-radius: 4px; font-weight: bold; }
-        
-        /* Rezultati povijesti ispod tražilice */
-        #results { 
-            margin-top: 10px; max-height: 400px; overflow-y: auto; 
-            display: none; background: #fff; font-size: 12px; border-top: 1px solid #eee; 
-        }
+        #results { margin-top: 10px; max-height: 400px; overflow-y: auto; display: none; background: #fff; font-size: 12px; border-top: 1px solid #eee; }
         .hist-item { padding: 8px 5px; border-bottom: 1px solid #f0f0f0; }
         .hist-item b { color: #ff7f00; }
-
-        /* Ikone autobusa (Cigle) */
-        .bus-marker { border-radius: 4px; border: 1.5px solid #222; display: flex; flex-direction: column; overflow: hidden; background: #fff; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); }
+        .bus-marker { border-radius: 4px; border: 1.5px solid #222; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
         .line-section { background: #ffffff; height: 40%; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #ddd; font-size: 11px; font-weight: 900; color: #ff7f00; }
         .garage-section { background: #ffcc00; height: 60%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 900; color: #fff; text-shadow: 1px 1px 1px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
     <div id="search-container">
-        <input type="text" id="bus-search" placeholder="Garažni broj (npr. 030)...">
+        <input type="text" id="bus-search" placeholder="Garažni broj (Enter za pretragu)...">
         <div id="results"></div>
     </div>
     <div id="map"></div>
-
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = L.map('map').setView([43.5147, 16.4435], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        
         var markers = {};
         var liveData = [];
 
-        // Funkcija koja pretražuje i mapu i bazu
         function performSearch() {
             var gbr = document.getElementById('bus-search').value;
             var resDiv = document.getElementById('results');
-            if(gbr.length < 2) { resDiv.style.display='none'; return; }
-
-            // 1. Ako je bus trenutno na cesti, nađi ga na mapi
+            if(gbr.length < 2) return;
             var active = liveData.find(b => b.garageNumber == gbr);
-            if(active) { 
-                map.setView([active.latitude, active.longitude], 17); 
-                markers[active.id].openPopup(); 
-            }
-
-            // 2. Povuci trajnu arhivu iz Supabase-a (preko Python rute)
-            fetch(`/api/full_history/${gbr}`)
-                .then(res => res.json())
-                .then(data => {
-                    resDiv.style.display = 'block';
-                    if(data.length === 0) { 
-                        resDiv.innerHTML = "<div class='hist-item'>Nema zapisa u arhivi.</div>"; 
-                    } else {
-                        let html = `<div style='padding:5px;'><b>Povijest kretanja (Gbr ${gbr}):</b></div>`;
-                        data.forEach(x => { 
-                            html += `<div class="hist-item">📅 ${x.date} ${x.time}<br><b>Linija ${x.line}</b> - <small>${x.reg}</small></div>`; 
-                        });
-                        resDiv.innerHTML = html;
-                    }
-                });
+            if(active) { map.setView([active.latitude, active.longitude], 17); markers[active.id].openPopup(); }
+            fetch(`/api/full_history/${gbr}`).then(res => res.json()).then(data => {
+                resDiv.style.display = 'block';
+                if(data.length === 0) { resDiv.innerHTML = "<div class='hist-item'>Nema zapisa.</div>"; }
+                else {
+                    let html = `<div style='padding:5px;'><b>Povijest kretanja:</b></div>`;
+                    data.forEach(x => { html += `<div class="hist-item">📅 ${x.date} ${x.time}<br><b>Linija ${x.line}</b> - ${x.reg}</div>`; });
+                    resDiv.innerHTML = html;
+                }
+            });
         }
 
-        // Osvježavanje pozicija na mapi
-        function updateMarkers() {
+        function update() {
             fetch('/api/buses').then(res => res.json()).then(data => {
                 liveData = data.vehicles || [];
                 liveData.forEach(bus => {
                     var line = bus.name.toString().replace(/\D/g, "");
                     var iconHtml = `<div class="bus-marker"><div class="line-section">${line}</div><div class="garage-section">${bus.garageNumber}</div></div>`;
                     var icon = L.divIcon({ html: iconHtml, className: '', iconSize: [45, 35], iconAnchor: [22, 17] });
-                    
-                    var popup = `<b>Linija ${line}</b><br>Gbr: ${bus.garageNumber}<br>Reg: ${bus.registrationNumber}`;
-
-                    if(markers[bus.id]) {
-                        markers[bus.id].setLatLng([bus.latitude, bus.longitude]).setPopupContent(popup);
-                    } else {
-                        markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map).bindPopup(popup);
-                    }
+                    if(markers[bus.id]) { markers[bus.id].setLatLng([bus.latitude, bus.longitude]); }
+                    else { markers[bus.id] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map).bindPopup(`Gbr: ${bus.garageNumber}<br>Reg: ${bus.registrationNumber}`); }
                 });
             });
         }
-
-        // Pretraga se aktivira kad stisneš Enter u polju
-        document.getElementById('bus-search').addEventListener('keyup', e => { 
-            if(e.key === 'Enter') performSearch(); 
-        });
-
-        // Osvježavaj svakih 10 sekundi
-        setInterval(updateMarkers, 10000); 
-        updateMarkers();
+        document.getElementById('bus-search').addEventListener('keyup', e => { if(e.key === 'Enter') performSearch(); });
+        setInterval(update, 10000);
+        update();
     </script>
 </body>
 </html>
