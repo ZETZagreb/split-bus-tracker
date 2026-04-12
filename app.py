@@ -16,37 +16,46 @@ def index():
 
 @app.route('/api/buses')
 def get_buses():
-    url = "https://www.bus-split.com/api/vehicles/live"
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    # Koristimo API koji napaja njihovu Fleet mapu
+    url = "https://fleet.promet-split.hr/api/v1/vehicles"
+    headers = {
+        'User-Agent': 'Mozilla/5.0',
+        'Referer': 'https://fleet.promet-split.hr/'
+    }
     try:
         r = requests.get(url, headers=headers, timeout=10)
-        data = r.json()
-        vehicles = data.get("vehicles", [])
+        vehicles = r.json()
+        
         now_date = datetime.now().strftime("%d.%m.%Y.")
         now_time = datetime.now().strftime("%H:%M")
         
         for bus in vehicles:
-            line_clean = str(bus.get("name", "")).replace("Linija ", "").strip()
-            trip_id = bus.get("tripId") or bus.get("blockId") or "N/A"
-            sch_dep = bus.get("scheduledDeparture") or "---"
-            direction = bus.get("destinationName") or "U prometu"
+            # Fleet API obično koristi 'lineCode' ili 'route'
+            line = str(bus.get("lineCode") or bus.get("lineName") or "N/A")
+            gbr = str(bus.get("garageNumber") or bus.get("id"))
+            
+            # Ključna polja koja tražiš (ovako ih šalje Fleet sustav)
+            direction = bus.get("destination") or bus.get("direction") or "Čeka polazak"
+            sch_dep = bus.get("departureTime") or bus.get("scheduledTime") or "---"
+            t_id = bus.get("tripId") or "N/A"
 
             try:
                 supabase.table("bus_logs").insert({
-                    "garage_num": str(bus.get("garageNumber")),
-                    "line": line_clean,
-                    "reg": str(bus.get("registrationNumber")),
+                    "garage_num": gbr,
+                    "line": line,
+                    "reg": str(bus.get("plateNumber") or bus.get("registration")),
                     "date": now_date,
                     "time": now_time,
                     "lat": bus.get("latitude"),
                     "lon": bus.get("longitude"),
-                    "trip_id": str(trip_id),
+                    "trip_id": str(t_id),
                     "scheduled_departure_time": str(sch_dep),
                     "direction": str(direction)
                 }).execute()
             except:
                 continue
-        return jsonify(data)
+                
+        return jsonify({"vehicles": vehicles})
     except Exception as e:
         return jsonify({"vehicles": [], "error": str(e)})
 
