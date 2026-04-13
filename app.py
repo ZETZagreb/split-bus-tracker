@@ -7,13 +7,10 @@ import math
 
 app = Flask(__name__)
 
-# Supabase setup
 SUPABASE_URL = "https://ohxghzlbdflyqjatcwcb.supabase.co"
 SUPABASE_KEY = "sb_publishable_hBKMq44_LWLCjlO_PfKQ9Q_yB-mZVDO"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# DEFINICIJA LINIJA (Terminali i Odredišta)
-# Format: "Linija": {"start": (lat, lon), "cilj_ime": "Odredište", "interval": minute}
 LINIJE_DATA = {
     "37": {"start": (43.514, 16.443), "odredista": ["Split", "Trogir"], "interval": 20},
     "60": {"start": (43.506, 16.441), "odredista": ["Split", "Omiš"], "interval": 30},
@@ -28,7 +25,6 @@ def get_croatia_time():
     return datetime.utcnow() + timedelta(hours=2)
 
 def haversine(lat1, lon1, lat2, lon2):
-    # Izračun zračne udaljenosti u km
     R = 6371
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
@@ -37,21 +33,16 @@ def haversine(lat1, lon1, lat2, lon2):
 
 def odredi_polazak_po_lokaciji(linija, lat, lon, sad):
     data = LINIJE_DATA.get(linija, LINIJE_DATA["default"])
-    start_lat, start_lon = data["start"]
-    
-    # Koliko je bus udaljen od starta (km)
-    dist = haversine(lat, lon, start_lat, start_lon)
-    
-    # Pretpostavljena prosječna brzina u gradu je 25 km/h (uključujući stanice)
+    dist = haversine(lat, lon, data["start"][0], data["start"][1])
     minuta_od_starta = (dist / 25) * 60
-    
-    # Stvarno vrijeme kretanja (Sad minus procijenjeno vrijeme puta)
     vrijeme_kretanja = sad - timedelta(minutes=minuta_od_starta)
-    
-    # Zaokruži na najbliži polazak prema intervalu te linije
     interval = data["interval"]
     zaokruzene_minute = (vrijeme_kretanja.minute // interval) * interval
     return vrijeme_kretanja.replace(minute=zaokruzene_minute).strftime("%H:%M")
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @app.route('/api/buses')
 def get_buses():
@@ -70,35 +61,54 @@ def get_buses():
             if not gbr or not lat: continue
             current_gbrs.append(gbr)
 
-            # 1. SMJER (Samo odredišta te linije)
             l_data = LINIJE_DATA.get(line, LINIJE_DATA["default"])
             if gbr not in trip_memory:
-                # Prva detekcija
                 dep = odredi_polazak_po_lokaciji(line, lat, lon, now)
-                trip_memory[gbr] = {'dep': dep, 'last_lon': lon, 'dir': l_data["odredista"][0]}
+                trip_memory[gbr] = {'dep': dep, 'last_lat': lat, 'last_lon': lon, 'dir': l_data["odredista"][0]}
             else:
-                # Ako se udaljava od starta, ide prema odredištu [1], ako se približava prema [0]
                 dist_now = haversine(lat, lon, l_data["start"][0], l_data["start"][1])
-                dist_old = haversine(trip_memory[gbr]['last_lat'], trip_memory[gbr]['last_lon'], l_data["start"][0], l_data["start"][1]) if 'last_lat' in trip_memory[gbr] else dist_now
+                dist_old = haversine(trip_memory[gbr]['last_lat'], trip_memory[gbr]['last_lon'], l_data["start"][0], l_data["start"][1])
                 
-                if dist_now > dist_old + 0.05: # Miče se od starta
+                if dist_now > dist_old + 0.05:
                     trip_memory[gbr]['dir'] = l_data["odredista"][1]
-                elif dist_now < dist_old - 0.05: # Vraća se prema startu
+                elif dist_now < dist_old - 0.05:
                     trip_memory[gbr]['dir'] = l_data["odredista"][0]
 
             trip_memory[gbr]['last_lat'] = lat
             trip_memory[gbr]['last_lon'] = lon
 
-            output.append({
-                "garageNumber": gbr, "latitude": lat, "longitude": lon, "name": line,
+            v = {
+                "garageNumber": gbr,
+                "latitude": lat,
+                "longitude": lon,
+                "name": line,
                 "destinationName": trip_memory[gbr]['dir'],
                 "scheduledDeparture": trip_memory[gbr]['dep']
-            })
-        
-        # Ovdje bi išao i Supabase insert po potrebi...
+            }
+            output.append(v)
+
+            try:
+                supabase.table("bus_logs").insert({
+                    "garage_num": gbr,
+                    "line": line,
+                    "reg": bus.get("registrationNumber") or "N/A",
+                    "date": now.strftime("%d.%m.%Y."),
+                    "time": now.strftime("%H:%M"),
+                    "lat": lat,
+                    "lon": lon,
+                    "scheduled_departure_time": v["scheduledDeparture"],
+                    "direction": v["destinationName"]
+                }).execute()
+            except:
+                pass
+
+        for k in list(trip_memory.keys()):
+            if k not in current_gbrs:
+                del trip_memory[k]
+
         return jsonify({"vehicles": output})
     except:
         return jsonify({"vehicles": []})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
