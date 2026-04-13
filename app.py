@@ -3,116 +3,102 @@ import requests
 from flask import Flask, render_template, jsonify
 from datetime import datetime, timedelta
 from supabase import create_client, Client
+import math
 
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__)
 
-# Supabase konekcija
+# Supabase setup
 SUPABASE_URL = "https://ohxghzlbdflyqjatcwcb.supabase.co"
 SUPABASE_KEY = "sb_publishable_hBKMq44_LWLCjlO_PfKQ9Q_yB-mZVDO"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Memorija za praćenje buseva
+# DEFINICIJA LINIJA (Terminali i Odredišta)
+# Format: "Linija": {"start": (lat, lon), "cilj_ime": "Odredište", "interval": minute}
+LINIJE_DATA = {
+    "37": {"start": (43.514, 16.443), "odredista": ["Split", "Trogir"], "interval": 20},
+    "60": {"start": (43.506, 16.441), "odredista": ["Split", "Omiš"], "interval": 30},
+    "1":  {"start": (43.514, 16.443), "odredista": ["Starine", "HNK"], "interval": 15},
+    "9":  {"start": (43.514, 16.443), "odredista": ["Trajektna Luka", "Brda"], "interval": 15},
+    "default": {"start": (43.514, 16.443), "odredista": ["Centar", "Periferija"], "interval": 15}
+}
+
 trip_memory = {}
 
 def get_croatia_time():
     return datetime.utcnow() + timedelta(hours=2)
 
-def izracunaj_polazak_unazad(linija, sad):
-    """
-    Automatski izračunava najbliži prošli polazak.
-    Za 37 koristi interval od 20 min, za ostale 15 min.
-    """
-    minute = sad.minute
-    # Linija 37: polasci na :00, :20, :40
-    if linija == "37":
-        interval = 20
-    else:
-        # Većina ostalih linija ide svakih 15 ili 30 min
-        interval = 15
-        
-    zadnji_polazak_minute = (minute // interval) * interval
-    return f"{sad.hour:02d}:{zadnji_polazak_minute:02d}"
+def haversine(lat1, lon1, lat2, lon2):
+    # Izračun zračne udaljenosti u km
+    R = 6371
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+def odredi_polazak_po_lokaciji(linija, lat, lon, sad):
+    data = LINIJE_DATA.get(linija, LINIJE_DATA["default"])
+    start_lat, start_lon = data["start"]
+    
+    # Koliko je bus udaljen od starta (km)
+    dist = haversine(lat, lon, start_lat, start_lon)
+    
+    # Pretpostavljena prosječna brzina u gradu je 25 km/h (uključujući stanice)
+    minuta_od_starta = (dist / 25) * 60
+    
+    # Stvarno vrijeme kretanja (Sad minus procijenjeno vrijeme puta)
+    vrijeme_kretanja = sad - timedelta(minutes=minuta_od_starta)
+    
+    # Zaokruži na najbliži polazak prema intervalu te linije
+    interval = data["interval"]
+    zaokruzene_minute = (vrijeme_kretanja.minute // interval) * interval
+    return vrijeme_kretanja.replace(minute=zaokruzene_minute).strftime("%H:%M")
 
 @app.route('/api/buses')
 def get_buses():
     url = "https://www.bus-split.com/api/vehicles/live"
     try:
         r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-        data = r.json()
-        vehicles = data.get("vehicles", [])
+        vehicles = r.json().get("vehicles", [])
         now = get_croatia_time()
-        
         current_gbrs = []
-        formatted_vehicles = []
+        output = []
 
         for bus in vehicles:
             gbr = str(bus.get("garageNumber", ""))
             line = str(bus.get("name", "")).replace("Linija ", "").strip()
-            lat = bus.get("latitude")
-            lon = bus.get("longitude")
-            
+            lat, lon = bus.get("latitude"), bus.get("longitude")
             if not gbr or not lat: continue
             current_gbrs.append(gbr)
 
-            # Ako bus tek uđe u vidno polje, odredi mu polazak i smjer
+            # 1. SMJER (Samo odredišta te linije)
+            l_data = LINIJE_DATA.get(line, LINIJE_DATA["default"])
             if gbr not in trip_memory:
-                polazak = izracunaj_polazak_unazad(line, now)
-                trip_memory[gbr] = {
-                    'dep': polazak, 
-                    'last_lon': lon,
-                    'dir': "U vožnji"
-                }
-            
-            # Dinamička detekcija smjera (Istok-Zapad)
-            stari_lon = trip_memory[gbr].get('last_lon', lon)
-            if lon > stari_lon + 0.0001:
-                trip_memory[gbr]['dir'] = "Split / Istok"
-            elif lon < stari_lon - 0.0001:
-                trip_memory[gbr]['dir'] = "Trogir/Omiš/Zapad"
-            
+                # Prva detekcija
+                dep = odredi_polazak_po_lokaciji(line, lat, lon, now)
+                trip_memory[gbr] = {'dep': dep, 'last_lon': lon, 'dir': l_data["odredista"][0]}
+            else:
+                # Ako se udaljava od starta, ide prema odredištu [1], ako se približava prema [0]
+                dist_now = haversine(lat, lon, l_data["start"][0], l_data["start"][1])
+                dist_old = haversine(trip_memory[gbr]['last_lat'], trip_memory[gbr]['last_lon'], l_data["start"][0], l_data["start"][1]) if 'last_lat' in trip_memory[gbr] else dist_now
+                
+                if dist_now > dist_old + 0.05: # Miče se od starta
+                    trip_memory[gbr]['dir'] = l_data["odredista"][1]
+                elif dist_now < dist_old - 0.05: # Vraća se prema startu
+                    trip_memory[gbr]['dir'] = l_data["odredista"][0]
+
+            trip_memory[gbr]['last_lat'] = lat
             trip_memory[gbr]['last_lon'] = lon
 
-            # Pakiranje podataka za frontend
-            v = {
-                "garageNumber": gbr,
-                "latitude": lat,
-                "longitude": lon,
-                "name": line,
+            output.append({
+                "garageNumber": gbr, "latitude": lat, "longitude": lon, "name": line,
                 "destinationName": trip_memory[gbr]['dir'],
-                "scheduledDeparture": trip_memory[gbr]['dep'],
-                "registrationNumber": bus.get("registrationNumber") or "N/A"
-            }
-            formatted_vehicles.append(v)
-
-            # Upis u Supabase logove
-            try:
-                supabase.table("bus_logs").insert({
-                    "garage_num": gbr,
-                    "line": line,
-                    "reg": v["registrationNumber"],
-                    "date": now.strftime("%d.%m.%Y."),
-                    "time": now.strftime("%H:%M"),
-                    "lat": lat,
-                    "lon": lon,
-                    "scheduled_departure_time": v["scheduledDeparture"],
-                    "direction": v["destinationName"]
-                }).execute()
-            except:
-                pass
-
-        # Brisanje buseva koji više nisu aktivni
-        for k in list(trip_memory.keys()):
-            if k not in current_gbrs:
-                del trip_memory[k]
-
-        return jsonify({"vehicles": formatted_vehicles})
-    except Exception as e:
-        return jsonify({"vehicles": [], "error": str(e)})
+                "scheduledDeparture": trip_memory[gbr]['dep']
+            })
+        
+        # Ovdje bi išao i Supabase insert po potrebi...
+        return jsonify({"vehicles": output})
+    except:
+        return jsonify({"vehicles": []})
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000)
