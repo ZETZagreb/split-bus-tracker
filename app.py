@@ -16,51 +16,60 @@ def index():
 
 @app.route('/api/buses')
 def get_buses():
-    url = "https://split.prometko.si/api/direct/vehicles"
-    headers = {
-        'User-Agent': 'Mozilla/5.0',
-        'Accept': 'application/json'
-    }
+    # Koristimo najstabilniji izvor za lokaciju
+    url = "https://www.bus-split.com/api/vehicles/live"
+    headers = {'User-Agent': 'Mozilla/5.0'}
+    
     try:
         r = requests.get(url, headers=headers, timeout=10)
         data = r.json()
-        vehicles = data if isinstance(data, list) else data.get("vehicles", [])
+        vehicles = data.get("vehicles", [])
         
         now_date = datetime.now().strftime("%d.%m.%Y.")
         now_time = datetime.now().strftime("%H:%M")
-        formatted_vehicles = []
         
+        formatted_vehicles = []
         for bus in vehicles:
-            gbr = str(bus.get("garage_number") or bus.get("id") or "")
-            line = str(bus.get("line_name") or bus.get("line_code") or "---").replace("Linija ", "").strip()
-            dest = bus.get("destination") or bus.get("direction_name") or "U pripremi"
-            dep = bus.get("scheduled_departure") or bus.get("departure") or "---"
-            lat = bus.get("lat") or bus.get("latitude")
-            lon = bus.get("lon") or bus.get("longitude")
-            reg = bus.get("plate_number") or "N/A"
-
+            # Čišćenje i mapiranje
+            gbr = str(bus.get("garageNumber", ""))
+            line = str(bus.get("name", "")).replace("Linija ", "").strip()
+            
+            # Ako API ne šalje smjer, stavljamo "Čeka polazak" umjesto "U prometu"
+            dest = bus.get("destinationName")
+            if not dest or dest == "" or dest == "null":
+                dest = "Čeka polazak / Indisponiran"
+                
+            dep = bus.get("scheduledDeparture") or "---"
+            
             v = {
                 "garageNumber": gbr,
-                "latitude": lat,
-                "longitude": lon,
-                "registrationNumber": reg,
+                "latitude": bus.get("latitude"),
+                "longitude": bus.get("longitude"),
+                "registrationNumber": bus.get("registrationNumber") or "N/A",
                 "name": line,
                 "destinationName": dest,
                 "scheduledDeparture": dep
             }
             
-            if lat and lon:
+            if v["latitude"] and v["longitude"]:
                 formatted_vehicles.append(v)
+                # Arhiviranje u bazu
                 try:
                     supabase.table("bus_logs").insert({
-                        "garage_num": gbr, "line": line, "reg": reg,
-                        "date": now_date, "time": now_time, "lat": lat, "lon": lon,
-                        "trip_id": str(bus.get("trip_id") or ""),
-                        "scheduled_departure_time": str(dep), "direction": str(dest)
+                        "garage_num": gbr,
+                        "line": line,
+                        "reg": v["registrationNumber"],
+                        "date": now_date,
+                        "time": now_time,
+                        "lat": v["latitude"],
+                        "lon": v["longitude"],
+                        "trip_id": str(bus.get("tripId") or ""),
+                        "scheduled_departure_time": str(dep),
+                        "direction": str(dest)
                     }).execute()
                 except:
                     continue
-                
+                    
         return jsonify({"vehicles": formatted_vehicles})
     except:
         return jsonify({"vehicles": []})
