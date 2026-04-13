@@ -16,16 +16,10 @@ def index():
 
 @app.route('/api/buses')
 def get_buses():
-    # Najpouzdaniji izvor koji ne koristi tokene koji istječu
     url = "https://www.bus-split.com/api/vehicles/live"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json'
-    }
-    
+    headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         r = requests.get(url, headers=headers, timeout=15)
-        r.raise_for_status()
         data = r.json()
         vehicles = data.get("vehicles", [])
         
@@ -34,14 +28,10 @@ def get_buses():
         
         formatted_vehicles = []
         for bus in vehicles:
-            lat = bus.get("latitude")
-            lon = bus.get("longitude")
-            
+            lat, lon = bus.get("latitude"), bus.get("longitude")
             if lat and lon:
                 gbr = str(bus.get("garageNumber", ""))
                 line = str(bus.get("name", "")).replace("Linija ", "").strip()
-                
-                # Hvatanje smjera i polaska - ako su dostupni u sustavu
                 dest = bus.get("destinationName") or "Na liniji"
                 dep = bus.get("scheduledDeparture") or "---"
                 reg = bus.get("registrationNumber") or "N/A"
@@ -57,27 +47,19 @@ def get_buses():
                 }
                 formatted_vehicles.append(v)
 
-                # Upis u Supabase - bus_logs
                 try:
                     supabase.table("bus_logs").insert({
-                        "garage_num": gbr,
-                        "line": line,
-                        "reg": reg,
-                        "date": now_date,
-                        "time": now_time,
-                        "lat": lat,
-                        "lon": lon,
+                        "garage_num": gbr, "line": line, "reg": reg,
+                        "date": now_date, "time": now_time, "lat": lat, "lon": lon,
                         "trip_id": str(bus.get("tripId") or ""),
-                        "scheduled_departure_time": str(dep),
-                        "direction": str(dest)
+                        "scheduled_departure_time": str(dep), "direction": str(dest)
                     }).execute()
                 except:
-                    pass # Preskoči ako upis ne uspije trenutno
+                    pass
                     
         return jsonify({"vehicles": formatted_vehicles})
-    except Exception as e:
-        print(f"Greška: {e}")
-        return jsonify({"vehicles": [], "error": str(e)})
+    except:
+        return jsonify({"vehicles": []})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
