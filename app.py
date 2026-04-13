@@ -1,5 +1,6 @@
 import os
 import requests
+import time
 from flask import Flask, render_template, jsonify
 from datetime import datetime
 from supabase import create_client, Client
@@ -16,47 +17,58 @@ def index():
 
 @app.route('/api/buses')
 def get_buses():
-    # Vraćamo se na stabilan API
-    url = "https://www.bus-split.com/api/vehicles/live"
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    timestamp = int(time.time() * 1000)
+    url = f"https://api.promet-split.hr/Fleet/api/v1/live/vehicles?t={timestamp}"
+    
+    headers = {
+        'Accept': 'application/json',
+        'Authorization': 'HMAC IxbMAfY6J5x1rSyfGmLPcMfCcyamb7xEfIuUpb8KNeE=:ntIx3cqY9q0uXUeBdlAMbcLGN4/oY9FA8vbCN9rjG64=:19d1c32d-00ce-40ae-8a05-81cd34da3e8d:1776061779',
+        'x-auth-key': 'IxbMAfY6J5x1rSyfGmLPcMfCcyamb7xEfIuUpb8KNeE=',
+        'Origin': 'https://fleet.promet-split.hr',
+        'Referer': 'https://fleet.promet-split.hr/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36'
+    }
+
     try:
         r = requests.get(url, headers=headers, timeout=10)
-        data = r.json()
-        vehicles = data.get("vehicles", [])
+        fleet_data = r.json()
         
+        formatted_vehicles = []
         now_date = datetime.now().strftime("%d.%m.%Y.")
         now_time = datetime.now().strftime("%H:%M")
         
-        for bus in vehicles:
-            # Mapiranje podataka
-            line_clean = str(bus.get("name", "")).replace("Linija ", "").strip()
-            gbr = str(bus.get("garageNumber", ""))
-            
-            # Ključna polja za smjer i polazak
-            direction = bus.get("destinationName") or "U prometu"
-            sch_dep = bus.get("scheduledDeparture") or "---"
-            t_id = bus.get("tripId") or bus.get("blockId") or "N/A"
+        for bus in fleet_data:
+            lat = bus.get("lat")
+            lon = bus.get("lon")
+            gbr = str(bus.get("garageNumber") or "")
+            line = str(bus.get("lineCode") or "---")
+            dest = bus.get("destination") or "U prometu"
+            dep = bus.get("departureTime") or "---"
+            reg = bus.get("plateNumber") or "N/A"
 
-            # Spremanje u bazu
-            try:
-                supabase.table("bus_logs").insert({
-                    "garage_num": gbr,
-                    "line": line_clean,
-                    "reg": str(bus.get("registrationNumber", "N/A")),
-                    "date": now_date,
-                    "time": now_time,
-                    "lat": bus.get("latitude"),
-                    "lon": bus.get("longitude"),
-                    "trip_id": str(t_id),
-                    "scheduled_departure_time": str(sch_dep),
-                    "direction": str(direction)
-                }).execute()
-            except:
-                continue
-                
-        return jsonify(data)
-    except Exception as e:
-        return jsonify({"vehicles": [], "error": str(e)})
+            if lat and lon:
+                formatted_vehicles.append({
+                    "garageNumber": gbr,
+                    "latitude": lat,
+                    "longitude": lon,
+                    "registrationNumber": reg,
+                    "name": line,
+                    "destinationName": dest,
+                    "scheduledDeparture": dep
+                })
+                try:
+                    supabase.table("bus_logs").insert({
+                        "garage_num": gbr, "line": line, "reg": reg,
+                        "date": now_date, "time": now_time, "lat": lat, "lon": lon,
+                        "trip_id": str(bus.get("tripId") or ""),
+                        "scheduled_departure_time": str(dep), "direction": str(dest)
+                    }).execute()
+                except:
+                    continue
+                    
+        return jsonify({"vehicles": formatted_vehicles})
+    except:
+        return jsonify({"vehicles": []})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
