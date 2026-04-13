@@ -1,5 +1,6 @@
 import os
 import requests
+import time
 from flask import Flask, render_template, jsonify
 from datetime import datetime
 from supabase import create_client, Client
@@ -16,63 +17,67 @@ def index():
 
 @app.route('/api/buses')
 def get_buses():
-    # Koristimo najstabilniji izvor za lokaciju
-    url = "https://www.bus-split.com/api/vehicles/live"
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    # Pokušavamo dohvatiti podatke izravno s njihovog API-ja s tvojim ključem koji je još aktivan
+    timestamp = int(time.time() * 1000)
+    url = f"https://api.promet-split.hr/Fleet/api/v1/live/vehicles?t={timestamp}"
     
+    headers = {
+        'Accept': 'application/json',
+        'x-auth-key': 'IxbMAfY6J5x1rSyfGmLPcMfCcyamb7xEfIuUpb8KNeE=',
+        'Referer': 'https://fleet.promet-split.hr/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+
     try:
         r = requests.get(url, headers=headers, timeout=10)
-        data = r.json()
-        vehicles = data.get("vehicles", [])
-        
+        # Ako službeni API baci grešku (npr. 401), automatski skačemo na stabilnu verziju
+        if r.status_code != 200:
+            raise Exception("API Key Expired")
+            
+        vehicles = r.json()
+        formatted_vehicles = []
         now_date = datetime.now().strftime("%d.%m.%Y.")
         now_time = datetime.now().strftime("%H:%M")
         
-        formatted_vehicles = []
         for bus in vehicles:
-            # Čišćenje i mapiranje
-            gbr = str(bus.get("garageNumber", ""))
-            line = str(bus.get("name", "")).replace("Linija ", "").strip()
-            
-            # Ako API ne šalje smjer, stavljamo "Čeka polazak" umjesto "U prometu"
-            dest = bus.get("destinationName")
-            if not dest or dest == "" or dest == "null":
-                dest = "Čeka polazak / Indisponiran"
-                
-            dep = bus.get("scheduledDeparture") or "---"
-            
-            v = {
-                "garageNumber": gbr,
-                "latitude": bus.get("latitude"),
-                "longitude": bus.get("longitude"),
-                "registrationNumber": bus.get("registrationNumber") or "N/A",
-                "name": line,
-                "destinationName": dest,
-                "scheduledDeparture": dep
-            }
-            
-            if v["latitude"] and v["longitude"]:
+            lat = bus.get("lat")
+            lon = bus.get("lon")
+            gbr = str(bus.get("garageNumber") or "")
+            line = str(bus.get("lineCode") or "---")
+            dest = bus.get("destination") or "Čeka polazak"
+            dep = bus.get("departureTime") or "---"
+            reg = bus.get("plateNumber") or "N/A"
+
+            if lat and lon:
+                v = {
+                    "garageNumber": gbr,
+                    "latitude": lat,
+                    "longitude": lon,
+                    "registrationNumber": reg,
+                    "name": line,
+                    "destinationName": dest,
+                    "scheduledDeparture": dep
+                }
                 formatted_vehicles.append(v)
-                # Arhiviranje u bazu
+                
                 try:
                     supabase.table("bus_logs").insert({
-                        "garage_num": gbr,
-                        "line": line,
-                        "reg": v["registrationNumber"],
-                        "date": now_date,
-                        "time": now_time,
-                        "lat": v["latitude"],
-                        "lon": v["longitude"],
+                        "garage_num": gbr, "line": line, "reg": reg,
+                        "date": now_date, "time": now_time, "lat": lat, "lon": lon,
                         "trip_id": str(bus.get("tripId") or ""),
-                        "scheduled_departure_time": str(dep),
-                        "direction": str(dest)
+                        "scheduled_departure_time": str(dep), "direction": str(dest)
                     }).execute()
                 except:
                     continue
                     
         return jsonify({"vehicles": formatted_vehicles})
+
     except:
-        return jsonify({"vehicles": []})
+        # BACKUP: Ako Fleet API ne radi, koristi bus-split (autobusi su tu, ali nema smjera)
+        backup_url = "https://www.bus-split.com/api/vehicles/live"
+        r_back = requests.get(backup_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
+        data = r_back.json()
+        return jsonify(data)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
