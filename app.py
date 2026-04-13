@@ -10,34 +10,33 @@ SUPABASE_URL = "https://ohxghzlbdflyqjatcwcb.supabase.co"
 SUPABASE_KEY = "sb_publishable_hBKMq44_LWLCjlO_PfKQ9Q_yB-mZVDO"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Memorija za praćenje pokreta
-active_tracking = {}
+# Lokalna memorija za trajanje sesije (GBR -> {'dep': '07:05', 'active': True})
+trip_memory = {}
 
-# OVDE MOŽEŠ DODATI PRAVI VOZNI RED ZA KLJUČNE LINIJE
-# Ako linije nema ovdje, sustav će koristiti "pametno zaokruživanje"
-VOZNI_REDOVI = {
-    "37": ["07:05", "07:25", "07:45", "08:05", "08:25", "08:45"],
-    "6": ["07:00", "07:15", "07:30", "07:45", "08:00"]
-}
+def get_croatia_time():
+    # Prilagodba za našu vremensku zonu (UTC+2)
+    return datetime.utcnow() + timedelta(hours=2)
 
-def odredi_pravi_polazak(linija, trenutno_vrijeme):
+def odredi_najbolji_polazak(linija, trenutno_vrijeme):
     sad = trenutno_vrijeme
-    h_m = sad.strftime("%H:%M")
+    # Interval polazaka svakih 5 minuta
+    intervali = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
+    polasci = [f"{h:02d}:{m:02d}" for h in range(5, 24) for m in intervali]
+            
+    najbolji_termin = "---"
+    minimalna_razlika = 999
     
-    if linija in VOZNI_REDOVI:
-        polasci = VOZNI_REDOVI[linija]
-        # Tražimo polazak koji je bio najbliži, ali gledamo i kašnjenje
-        # Logika: Ako je bus krenuo u 07:14, a polasci su 07:05 i 07:25,
-        # razlika do 07:05 je 9 min (kašnjenje), a do 07:25 je 11 min (uranjanje).
-        # Sustav bira manju razliku.
-        najblizi = min(polasci, key=lambda x: abs((datetime.strptime(x, "%H:%M") - datetime.strptime(h_m, "%H:%M")).total_seconds()))
-        return najblizi
-    else:
-        # Ako nemamo vozni red za tu liniju, zaokruži na najbližih 5 min
-        minute = sad.minute
-        ostatak = minute % 5
-        novo = sad - timedelta(minutes=ostatak) if ostatak < 3 else sad + timedelta(minutes=(5 - ostatak))
-        return novo.strftime("%H:%M")
+    for p in polasci:
+        vrijeme_p = datetime.strptime(p, "%H:%M").replace(year=sad.year, month=sad.month, day=sad.day)
+        razlika = (sad - vrijeme_p).total_seconds() / 60
+        
+        # Gledamo polaske unutar zadnjih 20 min (kašnjenje) ili 5 min unaprijed
+        if -5 <= razlika <= 20:
+            if abs(razlika) < minimalna_razlika:
+                minimalna_razlika = abs(razlika)
+                najbolji_termin = p
+                
+    return najbolji_termin
 
 @app.route('/')
 def index():
@@ -48,58 +47,62 @@ def get_buses():
     url = "https://www.bus-split.com/api/vehicles/live"
     try:
         r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-        data = r.json()
-        vehicles = data.get("vehicles", [])
+        vehicles = r.json().get("vehicles", [])
         
-        now = datetime.now()
+        now = get_croatia_time()
         now_date = now.strftime("%d.%m.%Y.")
+        now_time_str = now.strftime("%H:%M")
         
         formatted_vehicles = []
+        current_gbrs = []
+
         for bus in vehicles:
             lat, lon = bus.get("latitude"), bus.get("longitude")
             if not lat or not lon: continue
 
             gbr = str(bus.get("garageNumber", ""))
             line = str(bus.get("name", "")).replace("Linija ", "").strip()
-            
-            if gbr not in active_tracking:
-                active_tracking[gbr] = {'lat': lat, 'lon': lon, 'status': 'miruje', 'fixed_dep': '---'}
+            current_gbrs.append(gbr)
 
-            # Detekcija pokreta (mora se pomaknuti s mjesta)
-            dist = abs(lat - active_tracking[gbr]['lat']) + abs(lon - active_tracking[gbr]['lon'])
+            # LOGIKA MEMORIJE:
+            # Ako bus već ima zapisan polazak od ranije, koristi njega. 
+            # Ako nema (tek je krenuo), izračunaj novi.
+            if gbr not in trip_memory or trip_memory[gbr]['line'] != line:
+                # Provjeri je li bus u pokretu (na osnovu API-ja ili jednostavne detekcije)
+                # Ovdje pretpostavljamo da je bus aktivan ako je u listi
+                novi_dep = odredi_najbolji_polazak(line, now)
+                trip_memory[gbr] = {'dep': novi_dep, 'line': line, 'last_seen': now}
             
-            if dist > 0.0012: # KRENUO JE
-                if active_tracking[gbr]['status'] == 'miruje':
-                    # Određujemo polazak prema voznom redu
-                    active_tracking[gbr]['fixed_dep'] = odredi_pravi_polazak(line, now)
-                    active_tracking[gbr]['status'] = 'u_pokretu'
-                active_tracking[gbr]['lat'] = lat
-                active_tracking[gbr]['lon'] = lon
-            elif dist < 0.0001: # STOJI
-                active_tracking[gbr]['status'] = 'miruje'
-                active_tracking[gbr]['fixed_dep'] = '---'
+            # Ažuriraj vrijeme zadnjeg viđenja
+            trip_memory[gbr]['last_seen'] = now
 
             v = {
                 "garageNumber": gbr, "latitude": lat, "longitude": lon,
-                "name": line, 
-                "destinationName": "U vožnji" if active_tracking[gbr]['status'] == 'u_pokretu' else "Na peronu",
-                "scheduledDeparture": active_tracking[gbr]['fixed_dep'],
+                "name": line,
+                "destinationName": "U prometu",
+                "scheduledDeparture": trip_memory[gbr]['dep'],
                 "registrationNumber": bus.get("registrationNumber") or "N/A"
             }
             formatted_vehicles.append(v)
 
-            if active_tracking[gbr]['status'] == 'u_pokretu':
-                try:
-                    supabase.table("bus_logs").insert({
-                        "garage_num": gbr, "line": line, "reg": v["registrationNumber"],
-                        "date": now_date, "time": now.strftime("%H:%M"), "lat": lat, "lon": lon,
-                        "scheduled_departure_time": str(v["scheduledDeparture"])
-                    }).execute()
-                except: pass
+            # Upis u Supabase
+            try:
+                supabase.table("bus_logs").insert({
+                    "garage_num": gbr, "line": line, "reg": v["registrationNumber"],
+                    "date": now_date, "time": now_time_str, "lat": lat, "lon": lon,
+                    "scheduled_departure_time": str(v["scheduledDeparture"]),
+                    "direction": "U prometu"
+                }).execute()
+            except: pass
+
+        # Čišćenje memorije: obriši buseve koji više nisu na mapi (završili rutu)
+        for gbr_key in list(trip_memory.keys()):
+            if gbr_key not in current_gbrs:
+                del trip_memory[gbr_key]
 
         return jsonify({"vehicles": formatted_vehicles})
-    except:
-        return jsonify({"vehicles": []})
+    except Exception as e:
+        return jsonify({"vehicles": [], "error": str(e)})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
