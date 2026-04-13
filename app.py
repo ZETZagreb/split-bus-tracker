@@ -6,88 +6,113 @@ from supabase import create_client, Client
 
 app = Flask(__name__, template_folder='templates')
 
+# Supabase konekcija
 SUPABASE_URL = "https://ohxghzlbdflyqjatcwcb.supabase.co"
 SUPABASE_KEY = "sb_publishable_hBKMq44_LWLCjlO_PfKQ9Q_yB-mZVDO"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Memorija za praćenje polaska i smjera
+# Memorija za praćenje buseva
 trip_memory = {}
-
-# Ovdje definiramo stvarne intervale (ovo simulira pravi vozni red)
-# Za 37 znamo da ide svakih 20 min, za gradske svakih 15 itd.
-VOZNI_RED_LOGIKA = {
-    "37": 20, "60": 30, "1": 15, "9": 15, "3": 15, "6": 15, "default": 20
-}
 
 def get_croatia_time():
     return datetime.utcnow() + timedelta(hours=2)
 
-def odredi_stvarni_polazak(linija, sad):
-    interval = VOZNI_RED_LOGIKA.get(linija, VOZNI_RED_LOGIKA["default"])
-    # Tražimo zadnji puni polazak (npr. ako je sad 20:38, a ide svakih 20 min, polazak je bio 20:20)
-    ukupno_minuta = sad.hour * 60 + sad.minute
-    zadnji_polazak_minuta = (ukupno_minuta // interval) * interval
-    
-    h = zadnji_polazak_minuta // 60
-    m = zadnji_polazak_minuta % 60
-    return f"{h:02d}:{m:02d}"
-
-def detektiraj_smjer(linija, lat, lon, stara_lokacija):
-    if not stara_lokacija:
-        return "U vožnji"
-    
-    stari_lat, stari_lon = stara_lokacija
-    # Primjer za liniju 37: Ako longitude raste, ide prema Splitu, ako opada prema Trogiru
+def izracunaj_polazak_unazad(linija, sad):
+    """
+    Automatski izračunava najbliži prošli polazak.
+    Za 37 koristi interval od 20 min, za ostale 15 min.
+    """
+    minute = sad.minute
+    # Linija 37: polasci na :00, :20, :40
     if linija == "37":
-        return "Split" if lon > stari_lon else "Trogir"
-    
-    # Općenita logika za ostale (zapad/istok)
-    if lon > stari_lon: return "Smjer Istok/Split"
-    if lon < stari_lon: return "Smjer Zapad/Van grada"
-    
-    return "U vožnji"
+        interval = 20
+    else:
+        # Većina ostalih linija ide svakih 15 ili 30 min
+        interval = 15
+        
+    zadnji_polazak_minute = (minute // interval) * interval
+    return f"{sad.hour:02d}:{zadnji_polazak_minute:02d}"
+
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @app.route('/api/buses')
 def get_buses():
     url = "https://www.bus-split.com/api/vehicles/live"
     try:
         r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-        vehicles = r.json().get("vehicles", [])
+        data = r.json()
+        vehicles = data.get("vehicles", [])
         now = get_croatia_time()
+        
         current_gbrs = []
+        formatted_vehicles = []
 
         for bus in vehicles:
             gbr = str(bus.get("garageNumber", ""))
             line = str(bus.get("name", "")).replace("Linija ", "").strip()
-            lat, lon = bus.get("latitude"), bus.get("longitude")
+            lat = bus.get("latitude")
+            lon = bus.get("longitude")
+            
+            if not gbr or not lat: continue
             current_gbrs.append(gbr)
 
-            # Ako je bus novi u memoriji
+            # Ako bus tek uđe u vidno polje, odredi mu polazak i smjer
             if gbr not in trip_memory:
-                # Izračunaj polazak unazad (ne "sad", nego kad je stvarno trebao krenuti)
-                polazak = odredi_stvarni_polazak(line, now)
+                polazak = izracunaj_polazak_unazad(line, now)
                 trip_memory[gbr] = {
                     'dep': polazak, 
-                    'line': line, 
-                    'last_loc': (lat, lon),
-                    'dir': "Detekcija..."
+                    'last_lon': lon,
+                    'dir': "U vožnji"
                 }
-            else:
-                # Ažuriraj smjer na temelju kretanja
-                novi_smjer = detektiraj_smjer(line, lat, lon, trip_memory[gbr]['last_loc'])
-                trip_memory[gbr]['dir'] = novi_smjer
-                trip_memory[gbr]['last_loc'] = (lat, lon)
+            
+            # Dinamička detekcija smjera (Istok-Zapad)
+            stari_lon = trip_memory[gbr].get('last_lon', lon)
+            if lon > stari_lon + 0.0001:
+                trip_memory[gbr]['dir'] = "Split / Istok"
+            elif lon < stari_lon - 0.0001:
+                trip_memory[gbr]['dir'] = "Trogir/Omiš/Zapad"
+            
+            trip_memory[gbr]['last_lon'] = lon
 
-            bus['scheduledDeparture'] = trip_memory[gbr]['dep']
-            bus['destinationName'] = trip_memory[gbr]['dir']
+            # Pakiranje podataka za frontend
+            v = {
+                "garageNumber": gbr,
+                "latitude": lat,
+                "longitude": lon,
+                "name": line,
+                "destinationName": trip_memory[gbr]['dir'],
+                "scheduledDeparture": trip_memory[gbr]['dep'],
+                "registrationNumber": bus.get("registrationNumber") or "N/A"
+            }
+            formatted_vehicles.append(v)
 
-        # Čišćenje memorije
-        for key in list(trip_memory.keys()):
-            if key not in current_gbrs: del trip_memory[key]
+            # Upis u Supabase logove
+            try:
+                supabase.table("bus_logs").insert({
+                    "garage_num": gbr,
+                    "line": line,
+                    "reg": v["registrationNumber"],
+                    "date": now.strftime("%d.%m.%Y."),
+                    "time": now.strftime("%H:%M"),
+                    "lat": lat,
+                    "lon": lon,
+                    "scheduled_departure_time": v["scheduledDeparture"],
+                    "direction": v["destinationName"]
+                }).execute()
+            except:
+                pass
 
-        return jsonify({"vehicles": vehicles})
-    except:
-        return jsonify({"vehicles": []})
+        # Brisanje buseva koji više nisu aktivni
+        for k in list(trip_memory.keys()):
+            if k not in current_gbrs:
+                del trip_memory[k]
+
+        return jsonify({"vehicles": formatted_vehicles})
+    except Exception as e:
+        return jsonify({"vehicles": [], "error": str(e)})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
