@@ -1,46 +1,109 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Promet Split Arhiva</title>
+    <title>Promet Split Live</title>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
+        body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100%; }
-        .bus-label { 
-            background: white; border: 2px solid #ff8c00; font-weight: bold; 
-            text-align: center; border-radius: 4px; padding: 2px; color: #333;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.2); font-size: 11px; min-width: 35px;
+        
+        /* Tražilica */
+        #search-container {
+            position: absolute; top: 10px; left: 50px; z-index: 1000;
+            background: white; padding: 5px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
         }
-        .gbr-label { color: #ff8c00; font-size: 10px; border-top: 1px solid #eee; margin-top: 1px; }
+        #bus-search { padding: 8px; width: 150px; border: 1px solid #ccc; border-radius: 3px; }
+
+        /* DIZAJN IKONE: Gornji dio bijel, donji žut */
+        .bus-icon-complex {
+            display: flex; flex-direction: column;
+            width: 50px !important; height: 40px !important;
+            border: 2px solid #333; border-radius: 6px; overflow: hidden;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.4); font-family: Arial, sans-serif;
+        }
+        .bus-top { 
+            background: white; height: 55%; display: flex; 
+            align-items: center; justify-content: center;
+            color: #ff8c00; font-weight: bold; font-size: 14px; /* Linija narančasta */
+        }
+        .bus-bottom { 
+            background: #ffdb00; height: 45%; display: flex; 
+            align-items: center; justify-content: center;
+            color: white; font-weight: bold; font-size: 10px; /* Gbr bijeli */
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+        }
     </style>
 </head>
 <body>
+    <div id="search-container">
+        <input type="text" id="bus-search" placeholder="Traži Gbr ili Liniju..." oninput="filterBuses()">
+    </div>
     <div id="map"></div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        var map = L.map('map').setView([43.5147, 16.4435], 13);
+        var map = L.map('map', { zoomControl: true }).setView([43.5147, 16.4435], 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        var markers = {};
+        
+        var allMarkers = {};
+        var busData = [];
 
         function updateBuses() {
             fetch('/api/buses')
                 .then(res => res.json())
                 .then(data => {
-                    data.vehicles.forEach(bus => {
-                        var content = `<b>Gbr: ${bus.garageNumber}</b><br>Linija: ${bus.name}<br>Smjer: ${bus.destinationName}<br>Polazak: ${bus.scheduledDeparture}<br>Reg: ${bus.registrationNumber}`;
-                        if (markers[bus.garageNumber]) {
-                            markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]).setPopupContent(content);
-                        } else {
-                            var icon = L.divIcon({
-                                className: 'bus-label',
-                                html: `<div>${bus.name}</div><div class="gbr-label">${bus.garageNumber}</div>`,
-                                iconSize: [45, 35]
-                            });
-                            markers[bus.garageNumber] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map).bindPopup(content);
-                        }
-                    });
+                    busData = data.vehicles;
+                    renderMarkers();
                 });
         }
+
+        function renderMarkers() {
+            var searchTerm = document.getElementById('bus-search').value.toLowerCase();
+            
+            busData.forEach(bus => {
+                var isVisible = bus.garageNumber.toLowerCase().includes(searchTerm) || 
+                                bus.name.toLowerCase().includes(searchTerm);
+
+                var content = `
+                    <div style="font-family: Arial">
+                        <b>Gbr: ${bus.garageNumber}</b><br>
+                        <b>Linija: ${bus.name}</b><br>
+                        Smjer: ${bus.destinationName}<br>
+                        Polazak: ${bus.scheduledDeparture}<br>
+                        Reg: ${bus.registrationNumber}
+                    </div>
+                `;
+
+                if (isVisible) {
+                    if (allMarkers[bus.garageNumber]) {
+                        allMarkers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]).setPopupContent(content);
+                    } else {
+                        var icon = L.divIcon({
+                            className: '',
+                            html: `
+                                <div class="bus-icon-complex">
+                                    <div class="bus-top">${bus.name}</div>
+                                    <div class="bus-bottom">${bus.garageNumber}</div>
+                                </div>
+                            `,
+                            iconSize: [50, 40],
+                            iconAnchor: [25, 20]
+                        });
+                        allMarkers[bus.garageNumber] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map).bindPopup(content);
+                    }
+                } else {
+                    if (allMarkers[bus.garageNumber]) {
+                        map.removeLayer(allMarkers[bus.garageNumber]);
+                        delete allMarkers[bus.garageNumber];
+                    }
+                }
+            });
+        }
+
+        function filterBuses() { renderMarkers(); }
+
         setInterval(updateBuses, 10000);
         updateBuses();
     </script>
