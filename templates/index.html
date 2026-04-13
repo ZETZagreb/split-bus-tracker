@@ -13,8 +13,9 @@
         }
         input { padding: 5px; width: 150px; }
         .bus-label {
-            background: white; border: 1px solid black; border-radius: 3px;
-            padding: 2px; font-weight: bold; text-align: center; font-size: 10px;
+            background: #ffcc00; border: 2px solid #333; border-radius: 5px;
+            padding: 2px; font-weight: bold; text-align: center; font-size: 11px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #000;
         }
     </style>
 </head>
@@ -41,7 +42,7 @@
                 
                 data.vehicles.forEach(bus => {
                     var labelContent = `<div class="bus-label">${bus.name}<br>${bus.garageNumber}</div>`;
-                    var icon = L.divIcon({ html: labelContent, className: '', iconSize: [35, 35] });
+                    var icon = L.divIcon({ html: labelContent, className: '', iconSize: [40, 40] });
 
                     if (markers[bus.garageNumber]) {
                         markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
@@ -49,7 +50,6 @@
                         markers[bus.garageNumber] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
                     }
 
-                    // POPUP SA SAMO 4 TRAŽENA PODATKA
                     markers[bus.garageNumber].bindPopup(`
                         <b>Gbr: ${bus.garageNumber}</b><br>
                         <b>Linija: ${bus.name}</b><br>
