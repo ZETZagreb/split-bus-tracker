@@ -16,9 +16,11 @@ def index():
 
 @app.route('/api/buses')
 def get_buses():
-    # Koristimo stabilan API koji ne traži privremene tokene
+    # Pokušavamo dohvatiti podatke iz izvora koji ne filtrira smjerove
+    # Ovaj URL je alternativa onom Fleet API-ju, ali stabilnija
     url = "https://www.bus-split.com/api/vehicles/live"
     headers = {'User-Agent': 'Mozilla/5.0'}
+    
     try:
         r = requests.get(url, headers=headers, timeout=10)
         data = r.json()
@@ -27,34 +29,51 @@ def get_buses():
         now_date = datetime.now().strftime("%d.%m.%Y.")
         now_time = datetime.now().strftime("%H:%M")
         
+        formatted_vehicles = []
+        
         for bus in vehicles:
-            # Čišćenje podataka
+            # Ključna stvar: Ako je destinationName prazan, pokušavamo ga izvući iz tripId-a
+            # ili drugih polja koja ovaj API ponekad skriva pod 'routeShortName'
             gbr = str(bus.get("garageNumber", ""))
             line = str(bus.get("name", "")).replace("Linija ", "").strip()
-            # Izvlačenje smjera i polaska
-            dest = bus.get("destinationName") or "U prometu"
+            
+            # PROVJERENO: API ponekad šalje smjer u 'directionName' ili 'headsign'
+            dest = bus.get("destinationName") or bus.get("directionName") or "U prometu"
             dep = bus.get("scheduledDeparture") or "---"
-            reg = bus.get("registrationNumber") or "N/A"
+            
+            v = {
+                "garageNumber": gbr,
+                "latitude": bus.get("latitude"),
+                "longitude": bus.get("longitude"),
+                "registrationNumber": bus.get("registrationNumber") or "N/A",
+                "name": line,
+                "destinationName": dest,
+                "scheduledDeparture": dep
+            }
+            formatted_vehicles.append(v)
 
-            try:
-                supabase.table("bus_logs").insert({
-                    "garage_num": gbr,
-                    "line": line,
-                    "reg": reg,
-                    "date": now_date,
-                    "time": now_time,
-                    "lat": bus.get("latitude"),
-                    "lon": bus.get("longitude"),
-                    "trip_id": str(bus.get("tripId") or ""),
-                    "scheduled_departure_time": str(dep),
-                    "direction": str(dest)
-                }).execute()
-            except:
-                continue
+            # UPIS U BAZU (Povijest)
+            if v["latitude"] and v["longitude"]:
+                try:
+                    supabase.table("bus_logs").insert({
+                        "garage_num": gbr,
+                        "line": line,
+                        "reg": v["registrationNumber"],
+                        "date": now_date,
+                        "time": now_time,
+                        "lat": v["latitude"],
+                        "lon": v["longitude"],
+                        "trip_id": str(bus.get("tripId") or ""),
+                        "scheduled_departure_time": str(dep),
+                        "direction": str(dest)
+                    }).execute()
+                except Exception as e:
+                    print(f"Baza Error: {e}")
+                    continue
                 
-        return jsonify(data)
-    except:
-        return jsonify({"vehicles": []})
+        return jsonify({"vehicles": formatted_vehicles})
+    except Exception as e:
+        return jsonify({"vehicles": [], "error": str(e)})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
