@@ -31,14 +31,19 @@ def haversine(lat1, lon1, lat2, lon2):
     a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
 
-def odredi_polazak_po_lokaciji(linija, lat, lon, sad):
+def odredi_precizni_polazak(linija, lat, lon, sad):
     data = LINIJE_DATA.get(linija, LINIJE_DATA["default"])
     dist = haversine(lat, lon, data["start"][0], data["start"][1])
-    minuta_od_starta = (dist / 25) * 60
+    minuta_od_starta = (dist / 22) * 60
     vrijeme_kretanja = sad - timedelta(minutes=minuta_od_starta)
     interval = data["interval"]
-    zaokruzene_minute = (vrijeme_kretanja.minute // interval) * interval
-    return vrijeme_kretanja.replace(minute=zaokruzene_minute).strftime("%H:%M")
+    offset = (vrijeme_kretanja.minute % interval)
+    if offset > (interval / 2):
+        zaokruzene_minute = (vrijeme_kretanja.minute // interval + 1) * interval
+    else:
+        zaokruzene_minute = (vrijeme_kretanja.minute // interval) * interval
+    polazak_vrijeme = vrijeme_kretanja.replace(minute=0, second=0, microsecond=0) + timedelta(minutes=zaokruzene_minute)
+    return polazak_vrijeme.strftime("%H:%M")
 
 @app.route('/')
 def index():
@@ -49,7 +54,8 @@ def get_buses():
     url = "https://www.bus-split.com/api/vehicles/live"
     try:
         r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-        vehicles = r.json().get("vehicles", [])
+        data = r.json()
+        vehicles = data.get("vehicles", [])
         now = get_croatia_time()
         current_gbrs = []
         output = []
@@ -58,20 +64,30 @@ def get_buses():
             gbr = str(bus.get("garageNumber", ""))
             line = str(bus.get("name", "")).replace("Linija ", "").strip()
             lat, lon = bus.get("latitude"), bus.get("longitude")
+            reg = bus.get("registrationNumber") or "N/A"
+            
             if not gbr or not lat: continue
             current_gbrs.append(gbr)
 
             l_data = LINIJE_DATA.get(line, LINIJE_DATA["default"])
-            if gbr not in trip_memory:
-                dep = odredi_polazak_po_lokaciji(line, lat, lon, now)
-                trip_memory[gbr] = {'dep': dep, 'last_lat': lat, 'last_lon': lon, 'dir': l_data["odredista"][0]}
+            
+            if gbr not in trip_memory or trip_memory[gbr].get('line') != line:
+                dep = odredi_precizni_polazak(line, lat, lon, now)
+                trip_memory[gbr] = {
+                    'dep': dep, 
+                    'line': line,
+                    'last_lat': lat, 
+                    'last_lon': lon, 
+                    'dir': l_data["odredista"][0],
+                    'reg': reg
+                }
             else:
                 dist_now = haversine(lat, lon, l_data["start"][0], l_data["start"][1])
                 dist_old = haversine(trip_memory[gbr]['last_lat'], trip_memory[gbr]['last_lon'], l_data["start"][0], l_data["start"][1])
                 
-                if dist_now > dist_old + 0.05:
+                if dist_now > dist_old + 0.005:
                     trip_memory[gbr]['dir'] = l_data["odredista"][1]
-                elif dist_now < dist_old - 0.05:
+                elif dist_now < dist_old - 0.005:
                     trip_memory[gbr]['dir'] = l_data["odredista"][0]
 
             trip_memory[gbr]['last_lat'] = lat
@@ -83,7 +99,8 @@ def get_buses():
                 "longitude": lon,
                 "name": line,
                 "destinationName": trip_memory[gbr]['dir'],
-                "scheduledDeparture": trip_memory[gbr]['dep']
+                "scheduledDeparture": trip_memory[gbr]['dep'],
+                "registrationNumber": reg
             }
             output.append(v)
 
@@ -91,12 +108,12 @@ def get_buses():
                 supabase.table("bus_logs").insert({
                     "garage_num": gbr,
                     "line": line,
-                    "reg": bus.get("registrationNumber") or "N/A",
+                    "reg": reg,
                     "date": now.strftime("%d.%m.%Y."),
                     "time": now.strftime("%H:%M"),
                     "lat": lat,
                     "lon": lon,
-                    "scheduled_departure_time": v["scheduledDeparture"],
+                    "scheduled_departure_time": v["scheduled_departure_time"] if "scheduled_departure_time" in v else v["scheduledDeparture"],
                     "direction": v["destinationName"]
                 }).execute()
             except:
