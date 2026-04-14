@@ -7,79 +7,36 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 100vh; width: 100%; }
-        .search-container {
-            position: absolute; top: 10px; left: 50px; z-index: 1000;
-            background: white; padding: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-        input { padding: 5px; width: 150px; }
-        .bus-label {
-            background: #ffcc00; border: 2px solid #333; border-radius: 5px;
-            padding: 2px; font-weight: bold; text-align: center; font-size: 11px;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.3); color: #000;
-        }
+        .search-container { position: absolute; top: 10px; left: 50px; z-index: 1000; background: white; padding: 10px; border-radius: 5px; }
+        .bus-label { background: #ffcc00; border: 2px solid #333; border-radius: 5px; padding: 2px; font-weight: bold; text-align: center; font-size: 11px; }
     </style>
 </head>
 <body>
-
-<div class="search-container">
-    <input type="text" id="busSearch" placeholder="Traži Gbr ili Liniju..." onkeyup="filterBuses()">
-</div>
-
+<div class="search-container"><input type="text" id="busSearch" placeholder="Gbr ili Linija..." onkeyup="filterBuses()"></div>
 <div id="map"></div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     var map = L.map('map').setView([43.5147, 16.4435], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
     var markers = {};
 
     function updateBuses() {
-        fetch('/api/buses')
-            .then(response => response.json())
+        fetch('/api/buses', { headers: { 'Accept': 'application/json' } })
+            .then(res => res.json())
             .then(data => {
                 var currentGbrs = data.vehicles.map(v => v.garageNumber);
-                
                 data.vehicles.forEach(bus => {
-                    var labelContent = `<div class="bus-label">${bus.name}<br>${bus.garageNumber}</div>`;
-                    var icon = L.divIcon({ html: labelContent, className: '', iconSize: [40, 40] });
-
+                    var icon = L.divIcon({ html: `<div class="bus-label">${bus.name}<br>${bus.garageNumber}</div>`, className: '', iconSize: [40, 40] });
                     if (markers[bus.garageNumber]) {
                         markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
                     } else {
                         markers[bus.garageNumber] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
                     }
-
-                    markers[bus.garageNumber].bindPopup(`
-                        <b>Gbr: ${bus.garageNumber}</b><br>
-                        <b>Linija: ${bus.name}</b><br>
-                        Reg: ${bus.registrationNumber}<br>
-                        Marka: ${bus.brand}
-                    `);
+                    markers[bus.garageNumber].bindPopup(`<b>Gbr: ${bus.garageNumber}</b><br><b>Linija: ${bus.name}</b><br>Reg: ${bus.registrationNumber}<br>Marka: ${bus.brand}`);
                 });
-
-                for (var gbr in markers) {
-                    if (!currentGbrs.includes(gbr)) {
-                        map.removeLayer(markers[gbr]);
-                        delete markers[gbr];
-                    }
-                }
+                for (var gbr in markers) { if (!currentGbrs.includes(gbr)) { map.removeLayer(markers[gbr]); delete markers[gbr]; } }
             });
     }
-
-    function filterBuses() {
-        var val = document.getElementById('busSearch').value.toLowerCase();
-        for (var gbr in markers) {
-            var marker = markers[gbr];
-            var popupContent = marker.getPopup().getContent().toLowerCase();
-            if (popupContent.includes(val)) {
-                marker.setOpacity(1);
-            } else {
-                marker.setOpacity(0.1);
-            }
-        }
-    }
-
     setInterval(updateBuses, 5000);
     updateBuses();
 </script>
