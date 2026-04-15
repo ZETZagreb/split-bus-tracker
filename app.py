@@ -12,21 +12,11 @@ SUPABASE_URL = "https://ohxghzlbdflyqjatcwcb.supabase.co"
 SUPABASE_KEY = "sb_publishable_hBKMq44_LWLCjlO_PfKQ9Q_yB-mZVDO"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Memorija za praćenje intervala od 15 minuta (900 sekundi)
+# Memorija za praćenje intervala i promjene smjera
 last_saved = {}
 
 def get_croatia_time():
-    # Postavlja trenutno vrijeme za Hrvatsku
     return datetime.utcnow() + timedelta(hours=2)
-
-def get_bus_type(gbr):
-    try:
-        num = int(gbr)
-        if 716 <= num <= 725 or 731 <= num <= 750 or 811 <= num <= 830:
-            return "cng"
-    except:
-        pass
-    return "diesel"
 
 # --- RUTE ---
 
@@ -38,80 +28,73 @@ def index():
 def logs_page():
     return render_template('logs.html')
 
-@app.route('/api/logs')
-def get_logs_data():
+@app.route('/api/buses/split')
+def get_split_buses():
+    url = "https://fleet.promet-split.hr/api/vehicles"
     try:
-        # Dohvaća zadnjih 200 zapisa za Rijeku iz baze
-        res = supabase.table("bus_logs").select("*").eq("city", "Rijeka").order("id", desc=True).limit(200).execute()
-        return jsonify(res.data)
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
-@app.route('/api/buses/rijeka')
-def get_rijeka_buses():
-    url = "https://cloud.it-sistemi.com/AutotrolejS3/api/v1/vehicle-positions"
-    try:
-        r = requests.get(url, timeout=10)
-        data = r.json().get("data", [])
+        r = requests.get(url, timeout=15)
+        data = r.json()
+        
         now = get_croatia_time()
         current_ts = time.time()
-        
-        # Praćenje je aktivno do petka u 06:00
-        end_time = datetime(2026, 4, 17, 6, 0)
-        is_tracking_active = now < end_time
-
         output = []
+
         for bus in data:
-            gbr = str(bus.get("vehicleNumber", ""))
-            line = str(bus.get("lineName", "N/A"))
-            lat = bus.get("latitude")
-            lon = bus.get("longitude")
-            reg = bus.get("licensePlate", "N/A")
+            gbr = str(bus.get("label", ""))
+            line = str(bus.get("line_name", "N/A"))
+            direction = str(bus.get("direction_name", "N/A"))
+            lat = bus.get("lat")
+            lon = bus.get("lon")
+            reg = bus.get("plate", "N/A")
 
             if not gbr or lat is None or lat == 0:
                 continue
-            
-            # Podaci za kartu
+
+            # Podaci za mapu
             output.append({
                 "garageNumber": gbr,
                 "name": line,
                 "latitude": lat,
                 "longitude": lon,
-                "type": get_bus_type(gbr),
-                "destination": bus.get("destinationName", "N/A"),
+                "destination": direction,
                 "registration": reg,
                 "speed": bus.get("speed", 0)
             })
 
-            # LOGIRANJE U SUPABASE
-            if is_tracking_active:
-                # Provjera: je li prošlo 15 min ILI je nova linija?
-                bus_state = last_saved.get(gbr, {"ts": 0, "line": ""})
-                
-                if (current_ts - bus_state['ts'] >= 900) or (bus_state['line'] != line):
-                    try:
-                        supabase.table("bus_logs").insert({
-                            "garage_num": gbr,
-                            "line": line,
-                            "reg": reg,
-                            "lat": lat,
-                            "lon": lon,
-                            "city": "Rijeka",
-                            "date": now.strftime("%Y-%m-%d"),
-                            "time": now.strftime("%H:%M:%S")
-                        }).execute()
-                        
-                        # Ažuriraj zadnje spremljeno stanje
-                        last_saved[gbr] = {"ts": current_ts, "line": line}
-                    except Exception as e:
-                        print(f"Supabase Error za GBR {gbr}: {e}")
+            # LOGIRANJE: Spremi ako je prošlo 15 min ILI ako se promijenio SMJER
+            bus_id = f"ST_{gbr}"
+            state = last_saved.get(bus_id, {"ts": 0, "direction": ""})
+            
+            if (current_ts - state['ts'] >= 900) or (state['direction'] != direction):
+                try:
+                    supabase.table("bus_logs").insert({
+                        "garage_num": gbr,
+                        "line": line,
+                        "reg": reg,
+                        "lat": lat,
+                        "lon": lon,
+                        "city": "Split",
+                        "direction": direction,
+                        "date": now.strftime("%Y-%m-%d"),
+                        "time": now.strftime("%H:%M:%S")
+                    }).execute()
+                    
+                    last_saved[bus_id] = {"ts": current_ts, "direction": direction}
+                except Exception as e:
+                    print(f"Baza error: {e}")
 
         return jsonify({"vehicles": output})
     except Exception as e:
-        print(f"API Error: {e}")
         return jsonify({"vehicles": [], "error": str(e)})
 
+@app.route('/api/logs')
+def get_logs_data():
+    try:
+        res = supabase.table("bus_logs").select("*").eq("city", "Split").order("id", desc=True).limit(300).execute()
+        return jsonify(res.data)
+    except:
+        return jsonify([])
+
 if __name__ == '__main__':
-    # Render koristi PORT okolišnu varijablu
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
