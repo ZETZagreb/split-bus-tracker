@@ -1,6 +1,6 @@
 import os
 import requests
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 from datetime import datetime, timedelta
 from supabase import create_client, Client
 import time
@@ -11,7 +11,6 @@ SUPABASE_URL = "https://ohxghzlbdflyqjatcwcb.supabase.co"
 SUPABASE_KEY = "sb_publishable_hBKMq44_LWLCjlO_PfKQ9Q_yB-mZVDO"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Praćenje zadnjeg spremanja u bazu
 last_db_save = {}
 
 BUS_MODELS = {
@@ -116,7 +115,6 @@ def get_buses():
             }
             output.append(v)
 
-            # SPREMANJE U BAZU (Svakih 60s)
             if gbr not in last_db_save or (now_ts - last_db_save[gbr]) > 60:
                 try:
                     supabase.table("bus_logs").insert({
@@ -127,13 +125,12 @@ def get_buses():
                     last_db_save[gbr] = now_ts
                 except: pass
 
-        # Zahtjev dolazi od browsera -> vrati JSON
         if request.headers.get('Accept') and 'application/json' in request.headers.get('Accept'):
             return jsonify({"vehicles": output})
         
-        # Zahtjev dolazi od Cronjoba -> vrati samo OK (da ne bude "output too large")
         return "OK", 200
     except:
         return "Error", 500
 
-from flask import request # Dodajemo ovo na vrh kod uvoza
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
