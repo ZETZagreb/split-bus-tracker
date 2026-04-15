@@ -8,7 +8,7 @@
     <style>
         body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100%; }
-        .bus-icon {
+        .bus-label {
             width: 45px; height: 40px; border: 2px solid #333; border-radius: 6px;
             overflow: hidden; display: flex; flex-direction: column; font-family: Arial;
         }
@@ -26,24 +26,43 @@
         fetch('/api/buses/split')
             .then(res => res.json())
             .then(data => {
+                if(!data.vehicles) return;
                 var currentGbrs = data.vehicles.map(v => v.garageNumber);
+                
                 data.vehicles.forEach(bus => {
-                    var html = `<div class="bus-icon">
-                        <div style="background:white; color:#0054a6; height:20px; line-height:20px; font-weight:bold; text-align:center;">${bus.name}</div>
-                        <div style="background:#0054a6; color:white; height:20px; line-height:20px; font-weight:bold; font-size:11px; text-align:center;">${bus.garageNumber}</div>
-                    </div>`;
-                    var icon = L.divIcon({ html: html, className: '', iconSize: [45, 40] });
+                    var html = `
+                        <div class="bus-label">
+                            <div style="background:white; color:#0054a6; height:20px; line-height:20px; font-weight:bold; text-align:center; font-size:13px;">${bus.name}</div>
+                            <div style="background:#0054a6; color:white; height:20px; line-height:20px; font-weight:bold; text-align:center; font-size:11px;">${bus.garageNumber}</div>
+                        </div>`;
+                    
+                    var icon = L.divIcon({ html: html, className: '', iconSize: [45, 40], iconAnchor: [22, 20] });
                     
                     if (markers[bus.garageNumber]) {
                         markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
                     } else {
                         markers[bus.garageNumber] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
                     }
-                    markers[bus.garageNumber].bindPopup(`<b>Linija: ${bus.name}</b><br><b>Smjer: ${bus.destination}</b><br>Gbr: ${bus.garageNumber}`);
+                    
+                    // Ovdje se prikazuje točan polazak i smjer povučen iz API-ja
+                    markers[bus.garageNumber].bindPopup(`
+                        <b style="color:#0054a6; font-size:15px;">Linija ${bus.name}</b><br>
+                        <b style="font-size:13px;">Smjer: ${bus.destination}</b><hr>
+                        Garažni broj: ${bus.garageNumber}<br>
+                        Brzina: ${bus.speed} km/h
+                    `);
                 });
-                for (var gbr in markers) { if (!currentGbrs.includes(gbr)) { map.removeLayer(markers[gbr]); delete markers[gbr]; } }
+
+                // Brišemo markere autobusa koji više nisu na liniji
+                for (var gbr in markers) {
+                    if (!currentGbrs.includes(gbr)) {
+                        map.removeLayer(markers[gbr]);
+                        delete markers[gbr];
+                    }
+                }
             });
     }
+
     setInterval(updateBuses, 5000);
     updateBuses();
 </script>
