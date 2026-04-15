@@ -1,53 +1,44 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Split Bus Live</title>
+    <title>Promet Split Live</title>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; }
         #map { height: 100vh; width: 100%; }
-        .bus-label {
-            width: 45px; height: 40px; border: 2px solid #333; border-radius: 6px;
-            background: white; display: flex; flex-direction: column; font-family: Arial;
-        }
+        .search-container { position: absolute; top: 10px; left: 50px; z-index: 1000; background: white; padding: 10px; border-radius: 5px; }
+        .bus-label { background: #ffcc00; border: 2px solid #333; border-radius: 5px; padding: 2px; font-weight: bold; text-align: center; font-size: 11px; }
     </style>
 </head>
 <body>
-    <div id="map"></div>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        var map = L.map('map').setView([43.5081, 16.4402], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        var markers = {};
+<div class="search-container"><input type="text" id="busSearch" placeholder="Gbr ili Linija..." onkeyup="filterBuses()"></div>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    var map = L.map('map').setView([43.5147, 16.4435], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    var markers = {};
 
-        function update() {
-            fetch('/api/buses/split')
-                .then(res => res.json())
-                .then(data => {
-                    if (!data.vehicles) return;
-                    var activeGbrs = data.vehicles.map(v => v.garageNumber);
-                    
-                    data.vehicles.forEach(bus => {
-                        var html = `<div class="bus-label">
-                            <div style="color:#0054a6; height:20px; font-weight:bold; text-align:center;">${bus.name}</div>
-                            <div style="background:#0054a6; color:white; height:20px; text-align:center; font-size:11px;">${bus.garageNumber}</div>
-                        </div>`;
-                        var icon = L.divIcon({ html: html, className: '', iconSize: [45, 40] });
-                        
-                        if (markers[bus.garageNumber]) {
-                            markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
-                        } else {
-                            markers[bus.garageNumber] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
-                        }
-                        // Ovdje ćeš na klik vidjeti točan smjer polaska
-                        markers[bus.garageNumber].bindPopup(`<b>Linija ${bus.name}</b><br><b>Smjer: ${bus.destination}</b>`);
-                    });
-                    for (var g in markers) { if (!activeGbrs.includes(g)) { map.removeLayer(markers[g]); delete markers[g]; } }
+    function updateBuses() {
+        fetch('/api/buses', { headers: { 'Accept': 'application/json' } })
+            .then(res => res.json())
+            .then(data => {
+                var currentGbrs = data.vehicles.map(v => v.garageNumber);
+                data.vehicles.forEach(bus => {
+                    var icon = L.divIcon({ html: `<div class="bus-label">${bus.name}<br>${bus.garageNumber}</div>`, className: '', iconSize: [40, 40] });
+                    if (markers[bus.garageNumber]) {
+                        markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
+                    } else {
+                        markers[bus.garageNumber] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
+                    }
+                    markers[bus.garageNumber].bindPopup(`<b>Gbr: ${bus.garageNumber}</b><br><b>Linija: ${bus.name}</b><br>Reg: ${bus.registrationNumber}<br>Marka: ${bus.brand}`);
                 });
-        }
-        setInterval(update, 5000);
-        update();
-    </script>
+                for (var gbr in markers) { if (!currentGbrs.includes(gbr)) { map.removeLayer(markers[gbr]); delete markers[gbr]; } }
+            });
+    }
+    setInterval(updateBuses, 5000);
+    updateBuses();
+</script>
 </body>
 </html>
