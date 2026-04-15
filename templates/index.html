@@ -5,7 +5,8 @@
     <meta charset="utf-8" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        #map { height: 100vh; width: 100%; margin: 0; }
+        body { margin: 0; }
+        #map { height: 100vh; width: 100%; }
         .bus-label {
             width: 45px; height: 40px; border: 2px solid #333; border-radius: 6px;
             background: white; display: flex; flex-direction: column; font-family: Arial;
@@ -24,7 +25,9 @@
             fetch('/api/buses/split')
                 .then(res => res.json())
                 .then(data => {
+                    if (!data.vehicles) return;
                     var activeGbrs = data.vehicles.map(v => v.garageNumber);
+                    
                     data.vehicles.forEach(bus => {
                         var html = `<div class="bus-label">
                             <div style="color:#0054a6; height:20px; font-weight:bold; text-align:center;">${bus.name}</div>
@@ -37,8 +40,8 @@
                         } else {
                             markers[bus.garageNumber] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
                         }
-                        // Ovdje se vidi točan polazak/smjer s one stranice
-                        markers[bus.garageNumber].bindPopup(`<b>Linija ${bus.name}</b><br>Smjer: ${bus.destination}`);
+                        // Ovdje ćeš na klik vidjeti točan smjer polaska
+                        markers[bus.garageNumber].bindPopup(`<b>Linija ${bus.name}</b><br><b>Smjer: ${bus.destination}</b>`);
                     });
                     for (var g in markers) { if (!activeGbrs.includes(g)) { map.removeLayer(markers[g]); delete markers[g]; } }
                 });
