@@ -10,15 +10,15 @@ def index():
 
 @app.route('/api/buses/split')
 def get_split_buses():
+    # Direktni izvor s fleet.promet-split.hr
     url = "https://fleet.promet-split.hr/api/vehicles"
     try:
-        # Uzimamo podatke direktno s izvora koji si tražio
         r = requests.get(url, timeout=10)
         data = r.json()
         
         output = []
         for bus in data:
-            # Čitamo točno ono što stranica šalje
+            # Uzimamo podatke za kartu i smjer polaska
             output.append({
                 "garageNumber": str(bus.get("label", "")),
                 "name": str(bus.get("line_name", "N/A")),
