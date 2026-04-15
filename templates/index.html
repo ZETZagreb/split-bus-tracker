@@ -8,7 +8,6 @@
     <style>
         body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100%; }
-        
         .search-container {
             position: absolute; 
             top: 10px; 
@@ -19,9 +18,7 @@
             border-radius: 5px; 
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
-        
         input { padding: 5px; width: 150px; border: 1px solid #ccc; border-radius: 3px; }
-
         .bus-label {
             width: 45px;
             height: 40px;
@@ -33,7 +30,6 @@
             display: flex;
             flex-direction: column;
         }
-
         .bus-top {
             background: white;
             color: #ff6600;
@@ -43,7 +39,6 @@
             font-size: 13px;
             text-align: center;
         }
-
         .bus-bottom {
             background: #ffcc00;
             color: white;
@@ -57,20 +52,15 @@
     </style>
 </head>
 <body>
-
 <div class="search-container">
     <input type="text" id="busSearch" placeholder="Gbr ili Linija..." onkeyup="filterBuses()">
 </div>
-
 <div id="map"></div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     var map = L.map('map').setView([43.5147, 16.4435], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
     var markers = {};
-
     function updateBuses() {
         fetch('/api/buses', { headers: { 'Accept': 'application/json' } })
             .then(res => res.json())
@@ -83,14 +73,12 @@
                             <div class="bus-bottom">${bus.garageNumber}</div>
                         </div>
                     `;
-
                     var icon = L.divIcon({ 
                         html: labelContent, 
                         className: '', 
                         iconSize: [45, 40],
                         iconAnchor: [22, 20]
                     });
-
                     if (markers[bus.garageNumber]) {
                         markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
                     } else {
@@ -101,7 +89,6 @@
                 for (var gbr in markers) { if (!currentGbrs.includes(gbr)) { map.removeLayer(markers[gbr]); delete markers[gbr]; } }
             });
     }
-
     function filterBuses() {
         var val = document.getElementById('busSearch').value.toLowerCase();
         for (var gbr in markers) {
@@ -113,7 +100,6 @@
             }
         }
     }
-
     setInterval(updateBuses, 5000);
     updateBuses();
 </script>
