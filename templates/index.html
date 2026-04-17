@@ -146,10 +146,16 @@
                 data.vehicles.forEach(bus => {
                     var isHighlighted = HIGHLIGHTED_GBRS.includes(bus.garageNumber);
                     var labelClass = isHighlighted ? "bus-label highlight" : "bus-label";
+                    
+                    var bottomText = bus.garageNumber;
+                    if (bus.garageNumber === "318") {
+                        bottomText = "318 Tomo";
+                    }
+                    
                     var labelContent = `
                         <div class="${labelClass}">
                             <div class="bus-top">${bus.name}</div>
-                            <div class="bus-bottom">${bus.garageNumber}</div>
+                            <div class="bus-bottom">${bottomText}</div>
                         </div>
                     `;
                     var icon = L.divIcon({ 
@@ -208,7 +214,11 @@
                 var item = uniqueSuggestions[i];
                 var div = document.createElement('div');
                 div.className = 'autocomplete-item';
-                div.innerHTML = `<span class="autocomplete-gbr">${item.gbr}</span><span class="autocomplete-line">Linija ${item.line}</span>`;
+                var displayText = item.gbr;
+                if (item.gbr === "318") {
+                    displayText = "318 Tomo";
+                }
+                div.innerHTML = `<span class="autocomplete-gbr">${displayText}</span><span class="autocomplete-line">Linija ${item.line}</span>`;
                 div.onclick = (function(gbr, marker) {
                     return function() {
                         document.getElementById('busSearch').value = gbr;
