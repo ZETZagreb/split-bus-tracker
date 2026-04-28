@@ -5,10 +5,10 @@ from flask import Flask, render_template, jsonify
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app) 
+CORS(app) # Ključno: dopušta tvojoj stranici da primi podatke
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Referer": "https://fleet.promet-split.hr/",
     "Accept": "application/json"
 }
@@ -23,18 +23,20 @@ def get_vehicles():
     url = f"https://api.promet-split.hr/Fleet/api/v1/live/vehicles?t={ts}"
     try:
         r = requests.get(url, headers=HEADERS, timeout=10)
+        r.raise_for_status()
         data = r.json()
-        # Izvlačenje liste iz "data" objekta ako postoji
+        
+        # Novi API šalje listu unutar "data" polja ili direktno kao listu
         if isinstance(data, dict) and 'data' in data:
             return jsonify(data['data'])
-        return jsonify(data)
+        return jsonify(data if isinstance(data, list) else [])
     except Exception as e:
+        print(f"Greška na serveru: {e}")
         return jsonify([]), 500
 
 @app.route('/api/stops')
 def get_stops():
-    ts = int(time.time() * 1000)
-    url = f"https://api.promet-split.hr/Fleet/api/v1/stop?t={ts}"
+    url = "https://api.promet-split.hr/Fleet/api/v1/stop"
     try:
         r = requests.get(url, headers=HEADERS, timeout=10)
         data = r.json()
