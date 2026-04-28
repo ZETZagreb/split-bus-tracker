@@ -1,266 +1,122 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Promet Split Live</title>
+    <title>Split Transit History & Live</title>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; padding: 0; }
-        #map { height: 100vh; width: 100%; }
-        .search-container {
-            position: absolute; 
-            top: 10px; 
-            left: 50px; 
-            z-index: 1000; 
-            background: white; 
-            padding: 10px; 
-            border-radius: 5px; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            display: flex;
-            gap: 10px;
-        }
-        .autocomplete-container {
-            position: relative;
-        }
-        .autocomplete-list {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid #ccc;
-            border-top: none;
-            border-radius: 0 0 5px 5px;
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 1001;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
-        .autocomplete-item {
-            padding: 8px 12px;
-            cursor: pointer;
-            border-bottom: 1px solid #eee;
-            font-size: 13px;
-        }
-        .autocomplete-item:hover {
-            background-color: #f0f0f0;
-        }
-        .autocomplete-gbr {
-            font-weight: bold;
-            color: #ff6600;
-        }
-        .autocomplete-line {
-            color: #666;
-            font-size: 12px;
-            margin-left: 10px;
-        }
-        input { padding: 5px; width: 150px; border: 1px solid #ccc; border-radius: 3px; }
-        .stats {
-            position: absolute;
-            bottom: 10px;
-            right: 10px;
-            z-index: 1000;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 12px;
-        }
-        .bus-label {
-            width: 45px;
-            height: 40px;
-            border: 2px solid #333;
-            border-radius: 6px;
-            overflow: hidden;
-            font-family: 'Arial Black', sans-serif;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-            display: flex;
-            flex-direction: column;
-        }
-        .bus-top {
-            background: white;
-            color: #ff6600;
-            height: 20px;
-            line-height: 20px;
-            font-weight: bold;
-            font-size: 13px;
-            text-align: center;
-        }
-        .bus-bottom {
-            background: #ffcc00;
-            color: white;
-            height: 20px;
-            line-height: 20px;
-            font-weight: bold;
-            font-size: 11px;
-            text-align: center;
-            text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
-        }
-        .bus-label.highlight {
-            border: 3px solid #ff0000;
-            box-shadow: 0 0 15px rgba(255,0,0,0.9);
-            animation: pulse 0.8s infinite;
-        }
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.08); }
-            100% { transform: scale(1); }
-        }
-        .bus-label.highlight .bus-top {
-            background: #ff6600;
-            color: white;
-        }
-        .bus-label.highlight .bus-bottom {
-            background: #ff0000;
-            color: white;
-            font-weight: bold;
-            font-size: 12px;
-        }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        #top-bar { background: #0055a4; padding: 10px; display: flex; gap: 10px; z-index: 1001; color: white; align-items: center; }
+        #gbrSearch { flex-grow: 1; padding: 10px 20px; border-radius: 25px; border: none; font-size: 14px; }
+        #map { flex-grow: 1; width: 100%; }
+        #panel { height: 35%; overflow-y: auto; background: white; border-top: 3px solid #222; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f4f4f4; padding: 12px; border-bottom: 2px solid #ccc; position: sticky; top: 0; text-align: left; }
+        td { padding: 10px; border-bottom: 1px solid #eee; }
+        .gbr-label { background: #222; color: #ffc107; padding: 3px 6px; border-radius: 4px; font-weight: bold; font-family: monospace; }
+        .history-tag { display: inline-block; background: #e3f2fd; border: 1px solid #2196f3; color: #0d47a1; padding: 2px 6px; border-radius: 4px; margin: 2px; font-size: 11px; }
+
+        .split-icon { width: 42px !important; height: 42px !important; border-radius: 50%; border: 2px solid #333; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+        .icon-top { background: white; height: 50%; display: flex; align-items: center; justify-content: center; color: #ff6f00; font-weight: bold; font-size: 14px; border-bottom: 1px solid #333; }
+        .icon-bottom { background: #ffeb3b; height: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 11px; text-shadow: 1px 1px 1px rgba(0,0,0,0.6); }
     </style>
 </head>
 <body>
-<div class="search-container">
-    <div class="autocomplete-container">
-        <input type="text" id="busSearch" placeholder="Gbr ili Linija..." onkeyup="showSuggestions()" autocomplete="off">
-        <div id="suggestionsList" class="autocomplete-list" style="display: none;"></div>
-    </div>
-    <span id="busCount" style="font-size:12px; color:#333; line-height:28px;"></span>
+
+<div id="top-bar">
+    <input type="date" id="datePicker" style="padding: 5px; border-radius: 5px; border: none;">
+    <input type="text" id="gbrSearch" placeholder="🔍 Pretraži GBR ili povijest..." onkeyup="filterTable()">
 </div>
-<div class="stats">
-    <span id="statsText">Ažuriranje...</span>
-</div>
+
 <div id="map"></div>
+
+<div id="panel">
+    <table>
+        <thead>
+            <tr>
+                <th>GBR</th>
+                <th>Vozilo</th>
+                <th>Linija i Smjer</th>
+                <th>Dnevnik kretanja (Danas)</th>
+            </tr>
+        </thead>
+        <tbody id="busBody"></tbody>
+    </table>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     var map = L.map('map').setView([43.5147, 16.4435], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    var markers = {};
-    var HIGHLIGHTED_GBRS = ["307", "308"];
-    
-    function updateBuses() {
-        fetch('/api/buses', { headers: { 'Accept': 'application/json' } })
-            .then(res => res.json())
-            .then(data => {
-                var currentGbrs = data.vehicles.map(v => v.garageNumber);
-                data.vehicles.forEach(bus => {
-                    var isHighlighted = HIGHLIGHTED_GBRS.includes(bus.garageNumber);
-                    var labelClass = isHighlighted ? "bus-label highlight" : "bus-label";
-                    
-                    var bottomText = bus.garageNumber;
-                    if (bus.garageNumber === "318") {
-                        bottomText = "318 Tomo";
+
+    var busMarkers = {};
+    var stopLayer = L.layerGroup();
+    var historyData = {}; // Objekt za čuvanje kretanja tijekom dana
+    L.control.layers(null, { "Prikaži stanice": stopLayer }).addTo(map);
+
+    // Postavi današnji datum u picker
+    document.getElementById('datePicker').valueAsDate = new Date();
+
+    function update() {
+        fetch('/api/vehicles').then(r => r.json()).then(data => {
+            let vehicles = data.data || data;
+            let html = "";
+            let now = new Date().toLocaleTimeString('hr-HR', {hour: '2-digit', minute:'2-digit'});
+
+            vehicles.forEach(bus => {
+                let id = bus.deviceId || bus.id;
+                let gbr = bus.vehicleNumber || bus.label || "???";
+                let marka = bus.model || "Autobus";
+                if (gbr == "318") marka = marka.replace("Tomo", "").trim();
+
+                let linija = bus.lineCode || "???";
+                let smjer = bus.destination || "U prometu";
+                let lat = bus.latitude;
+                let lon = bus.longitude;
+
+                if (lat && lon) {
+                    // Bilježenje u povijest ako se linija ili smjer promijene
+                    if (!historyData[gbr]) {
+                        historyData[gbr] = [];
                     }
+                    let lastEntry = historyData[gbr][historyData[gbr].length - 1];
+                    let currentEntry = `${now} | L${linija} -> ${smjer}`;
                     
-                    var labelContent = `
-                        <div class="${labelClass}">
-                            <div class="bus-top">${bus.name}</div>
-                            <div class="bus-bottom">${bottomText}</div>
-                        </div>
-                    `;
-                    var icon = L.divIcon({ 
-                        html: labelContent, 
-                        className: '', 
-                        iconSize: [45, 40],
-                        iconAnchor: [22, 20]
-                    });
-                    if (markers[bus.garageNumber]) {
-                        markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
+                    if (!lastEntry || lastEntry.split('|')[1].trim() !== `L${linija} -> ${smjer}`) {
+                        historyData[gbr].push(currentEntry);
+                    }
+
+                    // Ikona
+                    let iconHtml = `<div class="split-icon"><div class="icon-top">${linija}</div><div class="icon-bottom">${gbr}</div></div>`;
+                    let customIcon = L.divIcon({ className: '', html: iconHtml, iconSize: [42, 42], iconAnchor: [21, 21] });
+
+                    if (busMarkers[id]) {
+                        busMarkers[id].setLatLng([lat, lon]).setIcon(customIcon);
                     } else {
-                        markers[bus.garageNumber] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
+                        busMarkers[id] = L.marker([lat, lon], {icon: customIcon}).addTo(map);
                     }
-                    markers[bus.garageNumber].bindPopup(`<b>Gbr: ${bus.garageNumber}</b><br><b>Linija: ${bus.name}</b><br>Reg: ${bus.registrationNumber}<br>Marka: ${bus.brand}`);
-                });
-                for (var gbr in markers) { if (!currentGbrs.includes(gbr)) { map.removeLayer(markers[gbr]); delete markers[gbr]; } }
-            });
-    }
-    
-    function showSuggestions() {
-        var input = document.getElementById('busSearch');
-        var val = input.value.toLowerCase().trim();
-        var suggestionsDiv = document.getElementById('suggestionsList');
-        
-        if (val.length < 2) {
-            suggestionsDiv.style.display = 'none';
-            return;
-        }
-        
-        var suggestions = [];
-        for (var gbr in markers) {
-            var marker = markers[gbr];
-            var popupContent = marker.getPopup().getContent();
-            var gbrMatch = popupContent.match(/Gbr: (\d+)/);
-            var lineMatch = popupContent.match(/Linija: (\d+[A-Z]?)/);
-            var garageNumber = gbrMatch ? gbrMatch[1] : '';
-            var line = lineMatch ? lineMatch[1] : '';
-            
-            if (garageNumber.includes(val) || line.includes(val)) {
-                suggestions.push({ gbr: garageNumber, line: line, marker: marker });
-            }
-        }
-        
-        var uniqueSuggestions = [];
-        var seenGbr = {};
-        for (var i = 0; i < suggestions.length; i++) {
-            if (!seenGbr[suggestions[i].gbr]) {
-                seenGbr[suggestions[i].gbr] = true;
-                uniqueSuggestions.push(suggestions[i]);
-            }
-        }
-        
-        if (uniqueSuggestions.length > 0) {
-            suggestionsDiv.innerHTML = '';
-            for (var i = 0; i < Math.min(uniqueSuggestions.length, 10); i++) {
-                var item = uniqueSuggestions[i];
-                var div = document.createElement('div');
-                div.className = 'autocomplete-item';
-                var displayText = item.gbr;
-                if (item.gbr === "318") {
-                    displayText = "318 Tomo";
+
+                    html += `<tr onclick="map.setView([${lat}, ${lon}], 17)">
+                        <td><span class="gbr-label">${gbr}</span></td>
+                        <td>${marka}</td>
+                        <td style="color:#d32f2f; font-weight:bold">${linija} ${smjer}</td>
+                        <td>${historyData[gbr].map(h => `<span class="history-tag">${h}</span>`).join("")}</td>
+                    </tr>`;
                 }
-                div.innerHTML = `<span class="autocomplete-gbr">${displayText}</span><span class="autocomplete-line">Linija ${item.line}</span>`;
-                div.onclick = (function(gbr, marker) {
-                    return function() {
-                        document.getElementById('busSearch').value = gbr;
-                        suggestionsDiv.style.display = 'none';
-                        map.setView(marker.getLatLng(), 15);
-                        marker.openPopup();
-                        filterBuses();
-                    };
-                })(item.gbr, item.marker);
-                suggestionsDiv.appendChild(div);
-            }
-            suggestionsDiv.style.display = 'block';
-        } else {
-            suggestionsDiv.style.display = 'none';
-        }
+            });
+            document.getElementById("busBody").innerHTML = html;
+        });
     }
-    
-    function filterBuses() {
-        var val = document.getElementById('busSearch').value.toLowerCase();
-        var brojac = 0;
-        for (var gbr in markers) {
-            var marker = markers[gbr];
-            var popupContent = marker.getPopup().getContent();
-            if (popupContent.toLowerCase().includes(val)) {
-                marker.setOpacity(1);
-                brojac++;
-            } else {
-                marker.setOpacity(0.2);
-            }
-        }
-        document.getElementById('busCount').innerHTML = `${brojac} / ${Object.keys(markers).length} vozila`;
+
+    function filterTable() {
+        let val = document.getElementById("gbrSearch").value.toLowerCase();
+        let rows = document.querySelectorAll("#busBody tr");
+        rows.forEach(r => r.style.display = r.innerText.toLowerCase().includes(val) ? "" : "none");
     }
-    
-    document.addEventListener('click', function(e) {
-        var container = document.querySelector('.autocomplete-container');
-        if (!container.contains(e.target)) {
-            document.getElementById('suggestionsList').style.display = 'none';
-        }
-    });
-    
-    setInterval(updateBuses, 5000);
-    updateBuses();
+
+    setInterval(update, 10000);
+    update();
 </script>
 </body>
 </html>
