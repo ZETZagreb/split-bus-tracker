@@ -10,27 +10,16 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 app = Flask(__name__)
 CORS(app)
 
-# Koristimo Session objekt da bi zadržali kolačiće (cookies)
-session = requests.Session()
+# Session pamti kolačiće koji se generiraju tijekom negotiate poziva
+s = requests.Session()
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "hr-HR,hr;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Origin": "https://fleet.promet-split.hr",
     "Referer": "https://fleet.promet-split.hr/",
-    "Connection": "keep-alive"
+    "Origin": "https://fleet.promet-split.hr",
+    "X-Requested-With": "XMLHttpRequest"
 }
-
-def ensure_session():
-    """Simulira inicijalni poziv sesije koji vidimo na slici"""
-    try:
-        ts = int(time.time() * 1000)
-        # Pozivamo session endpoint koji se vidi na slici image_30f7d1.png
-        session.get(f"https://api.promet-split.hr/Fleet/api/v1/session?t={ts}", 
-                    headers=HEADERS, verify=False, timeout=10)
-    except:
-        pass
 
 @app.route('/')
 def index():
@@ -38,23 +27,24 @@ def index():
 
 @app.route('/api/vehicles')
 def get_vehicles():
-    ensure_session() # Osvježavamo sesiju prije svakog poziva
-    
     ts = int(time.time() * 1000)
-    url = f"https://api.promet-split.hr/Fleet/api/v1/live/vehicles?t={ts}"
-    
     try:
-        r = session.get(url, headers=HEADERS, timeout=15, verify=False)
+        # 1. SignalR Negotiate (POST zahtjev)
+        neg_url = f"https://api.promet-split.hr/Fleet/api/v1/live/vehicles/negotiate?negotiateVersion=1&t={ts}"
+        s.post(neg_url, headers=HEADERS, verify=False, timeout=10)
         
-        # Ako je i dalje 401, probali smo sve s ove strane
-        if r.status_code == 401:
-            return jsonify({"error": "Unauthorized"}), 401
-            
-        data = r.json()
-        if isinstance(data, dict) and 'data' in data:
-            return jsonify(data['data'])
-        return jsonify(data if isinstance(data, list) else [])
+        # 2. Inicijalizacija sesije
+        s.get(f"https://api.promet-split.hr/Fleet/api/v1/session?t={ts}", headers=HEADERS, verify=False, timeout=10)
         
+        # 3. Finalni dohvat vozila
+        veh_url = f"https://api.promet-split.hr/Fleet/api/v1/live/vehicles?t={ts}"
+        r = s.get(veh_url, headers=HEADERS, verify=False, timeout=10)
+        
+        if r.status_code == 200:
+            data = r.json()
+            return jsonify(data['data'] if isinstance(data, dict) and 'data' in data else data)
+        
+        return jsonify([]), r.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
