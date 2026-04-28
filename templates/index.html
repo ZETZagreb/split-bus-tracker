@@ -2,30 +2,29 @@
 <html lang="hr">
 <head>
     <meta charset="UTF-8">
-    <title>Split Transit Tracker v1</title>
+    <title>Promet Split Live</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; background: #f8f9fa; }
-        #header { background: #0055a4; padding: 12px; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        #search { width: 100%; max-width: 500px; padding: 10px 20px; border-radius: 25px; border: none; display: block; margin: 0 auto; outline: none; }
-        #map { flex-grow: 1; width: 100%; }
-        #panel { height: 35%; overflow-y: auto; background: white; border-top: 2px solid #222; }
+        body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        #header { background: #0055a4; padding: 10px; z-index: 1000; }
+        #search { width: 100%; max-width: 400px; padding: 8px; border-radius: 20px; border: none; display: block; margin: 0 auto; }
+        #map { flex-grow: 1; }
+        #list { height: 35%; overflow-y: auto; background: white; border-top: 2px solid #222; }
         table { width: 100%; border-collapse: collapse; }
-        th { background: #eee; padding: 12px; position: sticky; top: 0; text-align: left; font-size: 13px; }
-        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
-        .gbr-label { background: #222; color: #ffc107; padding: 3px 7px; border-radius: 4px; font-weight: bold; font-family: monospace; }
-        .bus-icon { width: 44px!important; height: 44px!important; border-radius: 50%; border: 2px solid #333; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-        .i-line { background: white; height: 50%; display: flex; align-items: center; justify-content: center; color: #ff6f00; font-weight: bold; font-size: 14px; border-bottom: 1px solid #333; }
-        .i-gbr { background: #ffeb3b; height: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px; text-shadow: 1px 1px 1px #000; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+        .gbr { background: #222; color: #ffc107; padding: 2px 5px; border-radius: 3px; font-weight: bold; }
+        .bus-icon { width: 40px!important; height: 40px!important; border-radius: 50%; border: 2px solid #333; display: flex; flex-direction: column; overflow: hidden; }
+        .i-top { background: white; height: 50%; display: flex; align-items: center; justify-content: center; color: #ff6f00; font-weight: bold; }
+        .i-bot { background: #ffeb3b; height: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="header"><input type="text" id="search" placeholder="Pretraži vozilo ili liniju..." onkeyup="filter()"></div>
+<div id="header"><input type="text" id="search" placeholder="Pretraži..." onkeyup="filter()"></div>
 <div id="map"></div>
-<div id="panel">
+<div id="list">
     <table>
-        <thead><tr><th>GBR</th><th>Model</th><th>Linija i Odredište</th><th>Povijest (Dnevnik)</th></tr></thead>
+        <thead><tr><th>GBR</th><th>Linija</th><th>Odredište</th></tr></thead>
         <tbody id="busBody"></tbody>
     </table>
 </div>
@@ -34,59 +33,37 @@
 <script>
     var map = L.map('map').setView([43.5147, 16.4435], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    
     var markers = {};
-    var busLog = {};
 
     function update() {
         fetch('/api/vehicles').then(r => r.json()).then(data => {
             if (!Array.isArray(data)) return;
             let html = "";
-            let now = new Date().toLocaleTimeString('hr-HR', {hour: '2-digit', minute:'2-digit'});
-
             data.forEach(bus => {
                 let id = bus.deviceId || bus.id;
                 let gbr = bus.vehicleNumber || bus.label || "???";
                 let line = bus.lineCode || "---";
-                let dest = bus.destination || "U prometu";
-                let lat = bus.latitude;
-                let lon = bus.longitude;
+                let lat = bus.latitude, lon = bus.longitude;
 
                 if (lat && lon) {
-                    // Logika dnevnika
-                    if (!busLog[gbr]) busLog[gbr] = [];
-                    let status = `L${line} ➔ ${dest}`;
-                    if (busLog[gbr].length === 0 || busLog[gbr][busLog[gbr].length-1].s !== status) {
-                        busLog[gbr].push({t: now, s: status});
-                    }
-
-                    // Ikona
-                    let iconHtml = `<div class="bus-icon"><div class="i-line">${line}</div><div class="i-gbr">${gbr}</div></div>`;
-                    let icon = L.divIcon({ html: iconHtml, iconSize: [44, 44], iconAnchor: [22, 22], className: '' });
+                    let iconHtml = `<div class="bus-icon"><div class="i-top">${line}</div><div class="i-bot">${gbr}</div></div>`;
+                    let icon = L.divIcon({ html: iconHtml, iconSize: [40, 40], iconAnchor: [20, 20], className: '' });
 
                     if (markers[id]) {
                         markers[id].setLatLng([lat, lon]).setIcon(icon);
                     } else {
                         markers[id] = L.marker([lat, lon], {icon: icon}).addTo(map);
                     }
-
-                    html += `<tr onclick="map.setView([${lat}, ${lon}], 17)">
-                        <td><span class="gbr-label">${gbr}</span></td>
-                        <td>${bus.model || "Autobus"}</td>
-                        <td><b>${line}</b> <small>${dest}</small></td>
-                        <td style="font-size:11px; color:#555">${busLog[gbr].slice(-2).map(x => x.t + ' ' + x.s).join('<br>')}</td>
-                    </tr>`;
+                    html += `<tr onclick="map.setView([${lat}, ${lon}], 16)"><td><span class="gbr">${gbr}</span></td><td>${line}</td><td>${bus.destination || ''}</td></tr>`;
                 }
             });
             document.getElementById("busBody").innerHTML = html;
-        }).catch(err => console.error("API Error:", err));
+        });
     }
 
     function filter() {
         let v = document.getElementById("search").value.toLowerCase();
-        document.querySelectorAll("#busBody tr").forEach(r => {
-            r.style.display = r.innerText.toLowerCase().includes(v) ? "" : "none";
-        });
+        document.querySelectorAll("#busBody tr").forEach(r => r.style.display = r.innerText.toLowerCase().includes(v) ? "" : "none");
     }
 
     setInterval(update, 10000);
