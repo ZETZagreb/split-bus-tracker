@@ -1,148 +1,92 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Split Transit Tracker v1</title>
+    <title>Split Transit Tracker</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; height: 100vh; background: #f0f2f5; }
-        #top-bar { background: #0055a4; padding: 12px; display: flex; gap: 10px; z-index: 1001; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
-        #gbrSearch { flex-grow: 1; padding: 12px 20px; border-radius: 25px; border: none; outline: none; font-size: 15px; }
-        #map { flex-grow: 1; width: 100%; border-bottom: 2px solid #ccc; }
-        #panel { height: 38%; overflow-y: auto; background: white; }
-        
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        #top-bar { background: #0055a4; padding: 12px; z-index: 1001; }
+        #gbrSearch { width: 100%; max-width: 600px; padding: 10px 20px; border-radius: 20px; border: none; }
+        #map { flex-grow: 1; width: 100%; }
+        #panel { height: 35%; overflow-y: auto; background: white; border-top: 2px solid #333; }
         table { width: 100%; border-collapse: collapse; }
-        th { background: #f8f9fa; padding: 12px; border-bottom: 2px solid #dee2e6; position: sticky; top: 0; text-align: left; font-size: 13px; color: #444; }
-        td { padding: 12px; border-bottom: 1px solid #eee; font-size: 14px; vertical-align: top; }
-        
-        .gbr-badge { background: #222; color: #ffc107; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-family: 'Courier New', monospace; }
-        .line-tag { color: #d32f2f; font-weight: bold; font-size: 15px; }
-        .history-tag { display: inline-block; background: #e8f0fe; border: 1px solid #c2d7fa; color: #1967d2; padding: 2px 8px; border-radius: 12px; margin: 2px; font-size: 11px; font-weight: 500; }
-
-        /* Custom Ikona po tvojoj želji */
-        .bus-icon {
-            width: 44px!important; height: 44px!important;
-            border-radius: 50%; border: 2px solid #222;
-            overflow: hidden; display: flex; flex-direction: column;
-            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
-        }
-        .bus-icon-line {
-            background: white; height: 50%; display: flex; align-items: center; justify-content: center;
-            color: #ff6f00; font-weight: 900; font-size: 15px; border-bottom: 1px solid #222;
-        }
-        .bus-icon-gbr {
-            background: #ffeb3b; height: 50%; display: flex; align-items: center; justify-content: center;
-            color: white; font-weight: bold; font-size: 11px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
-        }
+        th { background: #f4f4f4; padding: 12px; position: sticky; top: 0; text-align: left; border-bottom: 2px solid #ccc; }
+        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+        .gbr-badge { background: #222; color: #ffc107; padding: 3px 6px; border-radius: 4px; font-weight: bold; }
+        .bus-icon { width: 44px!important; height: 44px!important; border-radius: 50%; border: 2px solid #333; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        .icon-top { background: white; height: 50%; display: flex; align-items: center; justify-content: center; color: #ff6f00; font-weight: bold; font-size: 14px; border-bottom: 1px solid #333; }
+        .icon-bottom { background: #ffeb3b; height: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 11px; text-shadow: 1px 1px 1px #000; }
     </style>
 </head>
 <body>
+    <div id="top-bar"><input type="text" id="gbrSearch" placeholder="Pretraži..." onkeyup="filterTable()"></div>
+    <div id="map"></div>
+    <div id="panel">
+        <table>
+            <thead><tr><th>GBR</th><th>Vozilo</th><th>Linija i Smjer</th><th>Dnevnik</th></tr></thead>
+            <tbody id="busBody"></tbody>
+        </table>
+    </div>
 
-<div id="top-bar">
-    <input type="text" id="gbrSearch" placeholder="🔍 Pretraži vozilo, liniju ili odredište..." onkeyup="filterTable()">
-</div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        var map = L.map('map').setView([43.5147, 16.4435], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        var markers = {};
+        var historyData = {};
 
-<div id="map"></div>
+        function update() {
+            fetch('/api/vehicles').then(r => r.json()).then(data => {
+                if (!Array.isArray(data)) return;
+                let html = "";
+                let now = new Date().toLocaleTimeString('hr-HR', {hour: '2-digit', minute:'2-digit'});
 
-<div id="panel">
-    <table>
-        <thead>
-            <tr>
-                <th style="width: 10%">GBR</th>
-                <th style="width: 20%">Tip Vozila</th>
-                <th style="width: 30%">Trenutna Linija</th>
-                <th style="width: 40%">Dnevni Log</th>
-            </tr>
-        </thead>
-        <tbody id="busBody"></tbody>
-    </table>
-</div>
+                data.forEach(bus => {
+                    let id = bus.deviceId || bus.id;
+                    let gbr = bus.vehicleNumber || bus.label || "???";
+                    let linija = bus.lineCode || "???";
+                    let model = bus.model || "Autobus";
+                    let smjer = bus.destination || "U prometu";
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-    var map = L.map('map').setView([43.5147, 16.4435], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                    if (gbr === "318") model = model.replace("Tomo", "");
 
-    var markers = {};
-    var stopLayer = L.layerGroup();
-    var historyLog = {}; 
-    L.control.layers(null, { "Stanice": stopLayer }).addTo(map);
+                    if (bus.latitude && bus.longitude) {
+                        // Logika za dnevnik
+                        if (!historyData[gbr]) historyData[gbr] = [];
+                        let status = `L${linija} -> ${smjer}`;
+                        if (historyData[gbr].length === 0 || historyData[gbr][historyData[gbr].length-1].status !== status) {
+                            historyData[gbr].push({time: now, status: status});
+                        }
 
-    function updateData() {
-        fetch('/api/vehicles').then(r => r.json()).then(res => {
-            let data = res.data || res;
-            if(!Array.isArray(data)) return;
-            
-            let html = "";
-            let timeStr = new Date().toLocaleTimeString('hr-HR', {hour: '2-digit', minute:'2-digit'});
+                        let iconHtml = `<div class="bus-icon"><div class="icon-top">${linija}</div><div class="icon-bottom">${gbr}</div></div>`;
+                        let icon = L.divIcon({ html: iconHtml, iconSize: [44, 44], iconAnchor: [22, 22], className: '' });
 
-            data.forEach(bus => {
-                let id = bus.deviceId || bus.id;
-                let gbr = bus.vehicleNumber || bus.label || "???";
-                let model = bus.model || "Autobus";
-                let linija = bus.lineCode || "---";
-                let smjer = bus.destination || "Van službe";
-                let lat = bus.latitude;
-                let lon = bus.longitude;
+                        if (markers[id]) {
+                            markers[id].setLatLng([bus.latitude, bus.longitude]).setIcon(icon);
+                        } else {
+                            markers[id] = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
+                        }
 
-                if (gbr === "318") model = model.replace("Tomo", "").trim();
-
-                if (lat && lon) {
-                    // Logika za dnevnik kretanja
-                    if (!historyLog[gbr]) historyLog[gbr] = [];
-                    let lastEntry = historyLog[gbr][historyLog[gbr].length - 1];
-                    let currentStatus = `L${linija} ➔ ${smjer}`;
-                    
-                    if (!lastEntry || lastEntry.status !== currentStatus) {
-                        historyLog[gbr].push({time: timeStr, status: currentStatus});
+                        html += `<tr onclick="map.setView([${bus.latitude}, ${bus.longitude}], 17)">
+                            <td><span class="gbr-badge">${gbr}</span></td>
+                            <td>${model}</td>
+                            <td><b>${linija}</b> ${smjer}</td>
+                            <td>${historyData[gbr].slice(-3).map(h => h.time + ' ' + h.status).join('<br>')}</td>
+                        </tr>`;
                     }
-
-                    // Marker dizajn
-                    let iconHtml = `<div class="bus-icon">
-                        <div class="bus-icon-line">${linija}</div>
-                        <div class="bus-icon-gbr">${gbr}</div>
-                    </div>`;
-                    let icon = L.divIcon({ className: '', html: iconHtml, iconSize: [44, 44], iconAnchor: [22, 22] });
-
-                    if (markers[id]) {
-                        markers[id].setLatLng([lat, lon]).setIcon(icon);
-                    } else {
-                        markers[id] = L.marker([lat, lon], {icon: icon}).addTo(map);
-                    }
-
-                    html += `<tr onclick="map.setView([${lat}, ${lon}], 17)">
-                        <td><span class="gbr-badge">${gbr}</span></td>
-                        <td>${model}</td>
-                        <td><span class="line-tag">${linija}</span> <small>${smjer}</small></td>
-                        <td>${historyLog[gbr].slice(-4).map(h => `<span class="history-tag">${h.time} | ${h.status}</span>`).join("")}</td>
-                    </tr>`;
-                }
-            });
-            document.getElementById("busBody").innerHTML = html;
-        });
-    }
-
-    // Inicijalno stanice
-    fetch('/api/stops').then(r => r.json()).then(res => {
-        let stops = res.data || res;
-        if(Array.isArray(stops)) {
-            stops.forEach(s => {
-                L.circleMarker([s.latitude, s.longitude], {
-                    radius: 4, color: '#0055a4', fillColor: '#fff', fillOpacity: 1, weight: 2
-                }).bindPopup(`<b>${s.name}</b>`).addTo(stopLayer);
+                });
+                document.getElementById("busBody").innerHTML = html;
             });
         }
-    });
 
-    function filterTable() {
-        let val = document.getElementById("gbrSearch").value.toLowerCase();
-        document.querySelectorAll("#busBody tr").forEach(r => {
-            r.style.display = r.innerText.toLowerCase().includes(val) ? "" : "none";
-        });
-    }
+        function filterTable() {
+            let v = document.getElementById("gbrSearch").value.toLowerCase();
+            document.querySelectorAll("#busBody tr").forEach(r => r.style.display = r.innerText.toLowerCase().includes(v) ? "" : "none");
+        }
 
-    setInterval(updateData, 10000);
-    updateData();
-</script>
+        setInterval(update, 10000);
+        update();
+    </script>
 </body>
 </html>
