@@ -1,5 +1,4 @@
-Flask
+flask
 requests
-supabase
-gunicorn
 flask-cors
+gunicorn
