@@ -37,6 +37,7 @@
             font-family: 'Arial Black', sans-serif;
             box-shadow: 0 2px 4px rgba(0,0,0,0.4);
             display: flex; flex-direction: column; background: white;
+            cursor: pointer;
         }
         .bus-top { background: white; color: #ff6600; height: 22px; line-height: 22px; font-weight: bold; font-size: 14px; text-align: center; }
         .bus-bottom { background: #ffcc00; color: white; height: 23px; line-height: 23px; font-weight: bold; font-size: 12px; text-align: center; }
@@ -59,7 +60,6 @@
     var map = L.map('map').setView([43.51, 16.44], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     var markers = {};
-    var busDetails = {};
     
     function formatTime(dateString) {
         if (!dateString) return "?";
@@ -67,56 +67,79 @@
         return date.toLocaleTimeString('hr-HR', {hour:'2-digit', minute:'2-digit'});
     }
     
-    function fetchBusDetails(garageNumber) {
+    async function fetchAndShowDetails(garageNumber, marker) {
         var timestamp = Date.now();
-        fetch(`https://www.bus-split.com/api/vehicles/details?id=${garageNumber}&t=${timestamp}`)
-            .then(r => r.json())
-            .then(data => {
-                busDetails[garageNumber] = data;
-                if (markers[garageNumber]) {
-                    var marker = markers[garageNumber];
-                    var smjer = data.pathwayName || "?";
-                    var expectedTime = formatTime(data.expectedArrivalTime);
-                    var plannedTime = formatTime(data.plannedArrivalTime);
-                    marker.getPopup().setContent(`
-                        <b>Gbr: ${garageNumber}</b><br>
-                        <b>Linija: ${data.name || "?"}</b><br>
-                        <b>Smjer: ${smjer}</b><br>
-                        <b>Dolazak:</b> ${expectedTime} (plan: ${plannedTime})
-                    `);
-                }
-            }).catch(e => console.error(e));
+        var url = `https://www.bus-split.com/api/vehicles/details?id=${garageNumber}&t=${timestamp}`;
+        
+        try {
+            var response = await fetch(url);
+            var data = await response.json();
+            
+            var smjer = data.pathwayName || "Nepoznat smjer";
+            var expectedTime = formatTime(data.expectedArrivalTime);
+            var plannedTime = formatTime(data.plannedArrivalTime);
+            var lineName = data.name || "?";
+            
+            var popupContent = `
+                <b>Gbr: ${garageNumber}</b><br>
+                <b>Linija: ${lineName}</b><br>
+                <b>Smjer: ${smjer}</b><br>
+                <b>Dolazak:</b> ${expectedTime} (plan: ${plannedTime})
+            `;
+            
+            marker.bindPopup(popupContent).openPopup();
+        } catch (error) {
+            console.error("Greška pri dohvatu detalja:", error);
+            marker.bindPopup(`
+                <b>Gbr: ${garageNumber}</b><br>
+                <b>Greška pri dohvatu podataka</b><br>
+                Pokušajte ponovo kasnije.
+            `).openPopup();
+        }
     }
     
-    function fetchLiveBuses() {
-        fetch(`https://www.bus-split.com/api/vehicles/live?t=${Date.now()}`)
-            .then(r => r.json())
-            .then(data => {
-                var vehicles = data.vehicles;
-                var currentGbrs = vehicles.map(v => v.garageNumber);
-                vehicles.forEach(bus => {
-                    var icon = L.divIcon({ 
-                        html: `<div class="bus-label"><div class="bus-top">${bus.name}</div><div class="bus-bottom">${bus.garageNumber}</div></div>`,
-                        className: '', iconSize: [55, 45], iconAnchor: [27, 22]
-                    });
-                    if (markers[bus.garageNumber]) {
-                        markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
-                    } else {
-                        var marker = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
-                        marker.on('click', () => fetchBusDetails(bus.garageNumber));
-                        markers[bus.garageNumber] = marker;
-                    }
-                    markers[bus.garageNumber].bindPopup(`<b>Gbr: ${bus.garageNumber}</b><br><b>Linija: ${bus.name}</b><br><i>Kliknite za smjer...</i>`);
-                    if (busDetails[bus.garageNumber]) fetchBusDetails(bus.garageNumber);
+    async function fetchLiveBuses() {
+        try {
+            var response = await fetch(`https://www.bus-split.com/api/vehicles/live?t=${Date.now()}`);
+            var data = await response.json();
+            var vehicles = data.vehicles;
+            var currentGbrs = vehicles.map(v => v.garageNumber);
+            
+            vehicles.forEach(bus => {
+                var icon = L.divIcon({ 
+                    html: `<div class="bus-label"><div class="bus-top">${bus.name}</div><div class="bus-bottom">${bus.garageNumber}</div></div>`,
+                    className: '', iconSize: [55, 45], iconAnchor: [27, 22]
                 });
-                for (var gbr in markers) { 
-                    if (!currentGbrs.includes(String(gbr))) { 
-                        map.removeLayer(markers[gbr]); delete markers[gbr]; delete busDetails[gbr];
-                    } 
+                
+                if (markers[bus.garageNumber]) {
+                    markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
+                } else {
+                    var marker = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
+                    marker.on('click', () => fetchAndShowDetails(bus.garageNumber, marker));
+                    markers[bus.garageNumber] = marker;
+                    
+                    marker.bindPopup(`
+                        <b>Gbr: ${bus.garageNumber}</b><br>
+                        <b>Linija: ${bus.name}</b><br>
+                        <i>Učitavam podatke...</i>
+                    `);
                 }
-                document.getElementById('statsText').innerHTML = `Ažurirano: ${new Date().toLocaleTimeString('hr-HR')} | ${Object.keys(markers).length} vozila`;
-                document.getElementById('busCount').innerHTML = `${Object.keys(markers).length} vozila`;
-            }).catch(e => console.error(e));
+            });
+            
+            for (var gbr in markers) { 
+                if (!currentGbrs.includes(String(gbr))) { 
+                    map.removeLayer(markers[gbr]); 
+                    delete markers[gbr]; 
+                } 
+            }
+            
+            var vehicleCount = Object.keys(markers).length;
+            document.getElementById('statsText').innerHTML = `Ažurirano: ${new Date().toLocaleTimeString('hr-HR')} | ${vehicleCount} vozila`;
+            document.getElementById('busCount').innerHTML = `${vehicleCount} vozila`;
+        } catch (error) {
+            console.error("Greška pri dohvatu vozila:", error);
+            document.getElementById('statsText').innerHTML = 'Greška pri učitavanju';
+        }
     }
     
     function showSuggestions() {
@@ -145,7 +168,7 @@
                     div.style.display = 'none';
                     map.setView(item.marker.getLatLng(), 15);
                     item.marker.openPopup();
-                    fetchBusDetails(item.gbr);
+                    fetchAndShowDetails(item.gbr, item.marker);
                     filterBuses();
                 };
                 div.appendChild(d);
@@ -170,8 +193,8 @@
         if (c && !c.contains(e.target)) document.getElementById('suggestionsList').style.display = 'none';
     });
     
-    setInterval(fetchLiveBuses, 10000);
     fetchLiveBuses();
+    setInterval(fetchLiveBuses, 10000);
 </script>
 </body>
 </html>
