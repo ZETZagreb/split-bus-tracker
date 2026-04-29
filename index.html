@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Promet Split - Live Autobusi sa stanicama</title>
+    <title>Promet Split - Live Autobusi sa svim stanicama</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -172,56 +172,29 @@
     var stopMarkers = [];
     var stopsVisible = true;
     
-    // STANICE - ugradjene iz tvog JSON-a
-    var stopsData = [
-        {"id":675228,"name":"BENE","geography":{"type":"Point","coordinates":[16.40275487,43.51377319]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"}]},
-        {"id":675229,"name":"INSTITUT 1","geography":{"type":"Point","coordinates":[16.3893455,43.5084295]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"}]},
-        {"id":675230,"name":"INSTITUT 2","geography":{"type":"Point","coordinates":[16.3893371,43.5081398]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"}]},
-        {"id":675231,"name":"KAŠJUNI 1","geography":{"type":"Point","coordinates":[16.4019926,43.5068289]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"}]},
-        {"id":675232,"name":"KAŠJUNI 2","geography":{"type":"Point","coordinates":[16.4016585,43.5066453]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"}]},
-        {"id":675233,"name":"PARK MARJAN - JUG 1","geography":{"type":"Point","coordinates":[16.3946593,43.5083903]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"}]},
-        {"id":675234,"name":"PARK MARJAN - JUG 2","geography":{"type":"Point","coordinates":[16.3953821,43.5084594]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"}]},
-        {"id":675235,"name":"PLAŽA KAŠJUNI 1","geography":{"type":"Point","coordinates":[16.4034497447505,43.5052624729483]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"}]},
-        {"id":675236,"name":"PLAŽA KAŠJUNI 2","geography":{"type":"Point","coordinates":[16.4035843,43.5051974]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"}]},
-        {"id":675237,"name":"VILA DALMACIJA 1","geography":{"type":"Point","coordinates":[16.411218,43.5046242]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"}]},
-        {"id":675238,"name":"VILA DALMACIJA 2","geography":{"type":"Point","coordinates":[16.4114862,43.504466]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"}]},
-        {"id":675239,"name":"PLAŽA KAŠTELET 1","geography":{"type":"Point","coordinates":[16.4150727,43.5041685]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"}]},
-        {"id":675240,"name":"PLAŽA KAŠTELET 2","geography":{"type":"Point","coordinates":[16.4154672,43.5041352]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"}]},
-        {"id":675241,"name":"GALERIJA MEŠTROVIĆ 1","geography":{"type":"Point","coordinates":[16.4189433,43.5042861]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"}]},
-        {"id":675242,"name":"GALERIJA MEŠTROVIĆ 2","geography":{"type":"Point","coordinates":[16.4185269,43.5042291]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"}]},
-        {"id":675243,"name":"SUPILOVA","geography":{"type":"Point","coordinates":[16.4186771,43.5054051]},"routes":[{"id":99795,"name":"12"},{"id":99803,"name":"21"}]},
-        {"id":675244,"name":"MUZEJ HAS 1","geography":{"type":"Point","coordinates":[16.4224091,43.5040005]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"}]},
-        {"id":675245,"name":"MUZEJ HAS 2","geography":{"type":"Point","coordinates":[16.4225971,43.5039285]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"}]},
-        {"id":675246,"name":"ŠKOLA MEJE","geography":{"type":"Point","coordinates":[16.4225482,43.5049747]},"routes":[{"id":99795,"name":"12"},{"id":99803,"name":"21"}]},
-        {"id":675247,"name":"GUNJAČINA - MUZEJ HAS","geography":{"type":"Point","coordinates":[16.4233639,43.5043105]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"},{"id":99802,"name":"20"},{"id":99803,"name":"21"}]},
-        {"id":675248,"name":"PUT MEJA - TUNEL","geography":{"type":"Point","coordinates":[16.4243146,43.504762]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"},{"id":99803,"name":"21"}]},
-        {"id":675249,"name":"MIHANOVIĆEVA 1","geography":{"type":"Point","coordinates":[16.4194027,43.505909]},"routes":[{"id":99795,"name":"12"},{"id":99803,"name":"21"}]},
-        {"id":675250,"name":"MIHANOVIĆEVA 2","geography":{"type":"Point","coordinates":[16.4239825,43.5057913]},"routes":[{"id":99795,"name":"12"},{"id":99803,"name":"21"}]},
-        {"id":675251,"name":"DRAŽANAC - BANOVINA","geography":{"type":"Point","coordinates":[16.4272468,43.5033906]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"},{"id":99802,"name":"20"},{"id":99803,"name":"21"}]},
-        {"id":675252,"name":"PUT MEJA","geography":{"type":"Point","coordinates":[16.4286944,43.5053275]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"},{"id":99803,"name":"21"}]},
-        {"id":675253,"name":"BRANIMIROVA - BANOVINA 1","geography":{"type":"Point","coordinates":[16.4284096,43.5032844]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"},{"id":99803,"name":"21"}]},
-        {"id":675254,"name":"BRANIMIROVA - BANOVINA 2","geography":{"type":"Point","coordinates":[16.4278244,43.5029671]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"},{"id":99803,"name":"21"}]},
-        {"id":675255,"name":"ZAPADNA OBALA 1","geography":{"type":"Point","coordinates":[16.4322449,43.5064117]},"routes":[{"id":99795,"name":"12"},{"id":99803,"name":"21"}]},
-        {"id":675256,"name":"ZAPADNA OBALA 2","geography":{"type":"Point","coordinates":[16.4312731,43.5056349]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99795,"name":"12"},{"id":99803,"name":"21"}]},
-        {"id":675257,"name":"SVETI FRANE","geography":{"type":"Point","coordinates":[16.4359771,43.5081396]},"routes":[{"id":99795,"name":"12"},{"id":99803,"name":"21"}]},
-        {"id":675258,"name":"H N K","geography":{"type":"Point","coordinates":[16.4384839,43.5108336]},"routes":[{"id":99782,"name":"1"},{"id":99787,"name":"5"},{"id":99788,"name":"5A"},{"id":99789,"name":"6"},{"id":99799,"name":"16"},{"id":99801,"name":"18"},{"id":99804,"name":"22"},{"id":99822,"name":"40"},{"id":99856,"name":"201"}]},
-        {"id":675259,"name":"MATOŠEVA - STARI PLAC","geography":{"type":"Point","coordinates":[16.435084,43.513009]},"routes":[{"id":99791,"name":"8"},{"id":99803,"name":"21"}]},
-        {"id":675260,"name":"MATOŠEVA 1","geography":{"type":"Point","coordinates":[16.4310239,43.5131183]},"routes":[{"id":99782,"name":"1"},{"id":99791,"name":"8"},{"id":99803,"name":"21"},{"id":99805,"name":"24"},{"id":99806,"name":"25"},{"id":99807,"name":"26"},{"id":99808,"name":"27"},{"id":99809,"name":"28"}]},
-        {"id":675261,"name":"MATOŠEVA 2","geography":{"type":"Point","coordinates":[16.4296224,43.5131338]},"routes":[{"id":99783,"name":"2"},{"id":99791,"name":"8"},{"id":99803,"name":"21"}]},
-        {"id":675262,"name":"SEDAM KAŠTELA - TUNEL","geography":{"type":"Point","coordinates":[16.4277845,43.5130696]},"routes":[{"id":99790,"name":"7"},{"id":99791,"name":"8"},{"id":99802,"name":"20"},{"id":99803,"name":"21"}]},
-        {"id":675263,"name":"SPINUT - STUDENTSKI DOM","geography":{"type":"Point","coordinates":[16.4237647,43.5151016]},"routes":[{"id":99782,"name":"1"},{"id":99783,"name":"2"},{"id":99790,"name":"7"},{"id":99794,"name":"11"},{"id":99796,"name":"13"},{"id":99800,"name":"17"},{"id":99801,"name":"18"},{"id":99802,"name":"20"},{"id":99805,"name":"24"},{"id":99806,"name":"25"},{"id":99807,"name":"26"},{"id":99808,"name":"27"},{"id":99809,"name":"28"},{"id":99810,"name":"29"},{"id":99811,"name":"30"},{"id":99854,"name":"199"}]},
-        {"id":675264,"name":"BAKOTIĆEVA 1","geography":{"type":"Point","coordinates":[16.4271502,43.5140364]},"routes":[{"id":99782,"name":"1"},{"id":99783,"name":"2"},{"id":99790,"name":"7"},{"id":99794,"name":"11"},{"id":99796,"name":"13"},{"id":99800,"name":"17"},{"id":99801,"name":"18"},{"id":99802,"name":"20"},{"id":99805,"name":"24"},{"id":99806,"name":"25"},{"id":99807,"name":"26"},{"id":99808,"name":"27"},{"id":99809,"name":"28"},{"id":99810,"name":"29"},{"id":99811,"name":"30"}]},
-        {"id":675265,"name":"BAKOTIĆEVA 2","geography":{"type":"Point","coordinates":[16.4268699,43.5141502]},"routes":[{"id":99794,"name":"11"},{"id":99796,"name":"13"},{"id":99800,"name":"17"},{"id":99802,"name":"20"}]}
-    ];
-    
     function formatTime(dateString) {
         if (!dateString) return "?";
         var date = new Date(dateString);
         return date.toLocaleTimeString('hr-HR', {hour:'2-digit', minute:'2-digit'});
     }
     
-    function addStopsToMap() {
-        stopsData.forEach(stop => {
+    function loadStops() {
+        fetch('stops.json')
+            .then(response => response.json())
+            .then(stops => {
+                allStops = stops;
+                addStopsToMap(stops);
+                console.log(`Učitano ${stops.length} stanica`);
+                document.getElementById('statsText').innerHTML = `Učitano ${stops.length} stanica | Ažuriranje...`;
+            })
+            .catch(err => {
+                console.error('Greška pri učitavanju stanica:', err);
+                document.getElementById('statsText').innerHTML = 'Greška: stops.json nije pronađen';
+            });
+    }
+    
+    function addStopsToMap(stops) {
+        stops.forEach(stop => {
             var lat = stop.geography.coordinates[1];
             var lng = stop.geography.coordinates[0];
             var routes = stop.routes ? stop.routes.map(r => r.name).join(', ') : '';
@@ -238,7 +211,6 @@
             marker.bindPopup(`<b>${stop.name}</b><br><b>Linije:</b> ${routes || 'Nema'}`);
             stopMarkers.push(marker);
         });
-        console.log(`Učitano ${stopMarkers.length} stanica`);
     }
     
     function toggleStops() {
@@ -322,7 +294,7 @@
             document.getElementById('busCount').innerHTML = `${vehicleCount} vozila`;
         } catch (error) {
             console.error("Greška:", error);
-            document.getElementById('statsText').innerHTML = 'Greška pri učitavanju';
+            document.getElementById('statsText').innerHTML = 'Greška pri učitavanju autobusa';
         }
     }
     
@@ -342,11 +314,13 @@
             }
         }
         
-        stopsData.forEach(stop => {
-            if (stop.name.toLowerCase().includes(val)) {
-                suggestions.push({ type: 'stop', name: stop.name, stop: stop });
-            }
-        });
+        if (allStops.length > 0) {
+            allStops.forEach(stop => {
+                if (stop.name.toLowerCase().includes(val)) {
+                    suggestions.push({ type: 'stop', name: stop.name, stop: stop });
+                }
+            });
+        }
         
         var unique = [];
         var seen = {};
@@ -415,7 +389,7 @@
     
     document.getElementById('toggleStopsBtn').onclick = toggleStops;
     
-    addStopsToMap();
+    loadStops();
     fetchLiveBuses();
     setInterval(fetchLiveBuses, 10000);
 </script>
