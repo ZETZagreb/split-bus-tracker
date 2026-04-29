@@ -178,48 +178,9 @@
     var stopMarkers = [];
     var stopsVisible = true;
     var timetables = {};
-    var lastUpdate = new Date();
     
     // ============================================================
-    // 3. VOZNI REDOVI (ugrađeni u kod)
-    // ============================================================
-    var TIMETABLES_DATA = {
-      "1": {
-        "name": "BUNJE - POLJIČKA - HNK - DOM. RATA - BUNJE",
-        "variants": {
-          "full": {
-            "destination": "BUNJE",
-            "direction": "kružna",
-            "schedules": {
-              "weekday": ["04:50","05:20","05:50","06:20","06:50","06:55","07:05","07:30","07:45","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","23:00"],
-              "saturday": ["04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","23:00"],
-              "sunday": ["04:30","05:30","06:30","07:00","07:30","08:30","09:30","10:30","11:30","12:30","13:30","14:30","15:30","16:30","17:30","18:30","19:30","20:30","21:30","22:30","23:30"]
-            }
-          }
-        }
-      },
-      "37": {
-        "name": "SPLIT - TROGIR (preko Airport)",
-        "variants": {
-          "to_trogir": {
-            "destination": "TROGIR",
-            "direction": "Split -> Trogir",
-            "schedules": {
-              "weekday": ["04:00","04:30","05:10","05:30","05:50","06:10","06:30","06:50","07:10","07:30","07:50","08:10","08:30","08:50","09:10","09:30","09:50","10:10","10:30","10:50","11:10","11:30","11:50","12:10","12:30","12:50","13:10","13:30","13:50","14:10","14:30","14:50","15:10","15:30","15:50","16:10","16:30","16:50","17:10","17:30","17:50","18:10","18:30","18:50","19:10","19:30","19:50","20:10","20:30","21:00","21:30","22:05","22:30","23:30","00:15"],
-              "saturday": ["04:30","05:00","05:30","06:00","06:30","07:00","07:30","08:00","08:30","08:50","09:10","09:30","09:50","10:10","10:30","10:50","11:10","11:30","11:50","12:10","12:30","12:50","13:10","13:30","13:50","14:10","14:30","15:10","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:05","22:30","23:00","23:30","00:15"],
-              "sunday": ["04:30","05:00","05:30","06:00","06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:05","22:30","23:00","23:30","00:15"]
-            }
-          }
-        }
-      }
-    };
-    
-    // Učitaj timetables (koristi ugrađene podatke, ali može i vanjski JSON)
-    timetables = TIMETABLES_DATA;
-    console.log("Vozni redovi učitani:", Object.keys(timetables));
-    
-    // ============================================================
-    // 4. FUNKCIJE ZA STANICE (koristi tvoj stops.json)
+    // 3. FUNKCIJE ZA STANICE
     // ============================================================
     function loadStops() {
         fetch('stops.json')
@@ -268,6 +229,23 @@
     }
     
     // ============================================================
+    // 4. UČITAVANJE VOZNOG REDA IZ JSON DATOTEKE
+    // ============================================================
+    function loadTimetables() {
+        fetch('timetables.json')
+            .then(response => response.json())
+            .then(data => {
+                timetables = data;
+                console.log("Vozni redovi učitani:", Object.keys(timetables));
+                document.getElementById('statsText').innerHTML = `Vozni red: ${Object.keys(timetables).length} linija | Ažuriranje...`;
+            })
+            .catch(err => {
+                console.error('Greška pri učitavanju voznog reda:', err);
+                document.getElementById('statsText').innerHTML = 'Upozorenje: timetables.json nije pronađen';
+            });
+    }
+    
+    // ============================================================
     // 5. FUNKCIJE ZA VOZNI RED (ODREĐIVANJE SMJERA)
     // ============================================================
     function getDayType() {
@@ -278,9 +256,9 @@
     }
     
     function getScheduleForLine(lineNumber, currentTime) {
-        const timetable = timetables[lineNumber];
-        if (!timetable) return null;
+        if (!timetables || !timetables[lineNumber]) return null;
         
+        const timetable = timetables[lineNumber];
         const variant = Object.values(timetable.variants)[0];
         const schedules = variant.schedules[getDayType()];
         if (!schedules || schedules.length === 0) return null;
@@ -332,7 +310,6 @@
                 var expectedTime = formatTime(data.expectedArrivalTime);
                 var plannedTime = formatTime(data.plannedArrivalTime);
                 
-                // Pokušaj odrediti smjer prema voznom redu
                 var currentTime = new Date();
                 var scheduleInfo = getScheduleForLine(lineName, currentTime);
                 var scheduleText = "";
@@ -402,7 +379,8 @@
             }
             
             var vehicleCount = Object.keys(markers).length;
-            document.getElementById('statsText').innerHTML = `Ažurirano: ${new Date().toLocaleTimeString('hr-HR')} | ${vehicleCount} vozila | Vozni red: ${Object.keys(timetables).length} linija`;
+            var timetablesCount = Object.keys(timetables).length;
+            document.getElementById('statsText').innerHTML = `Ažurirano: ${new Date().toLocaleTimeString('hr-HR')} | ${vehicleCount} vozila | Vozni red: ${timetablesCount} linija`;
             document.getElementById('busCount').innerHTML = `${vehicleCount} vozila`;
         } catch (error) {
             console.error("Greška:", error);
@@ -508,6 +486,7 @@
     document.getElementById('toggleStopsBtn').onclick = toggleStops;
     
     loadStops();
+    loadTimetables();   // ← OVO SADA UČITAVA PRAVI JSON!
     fetchLiveBuses();
     setInterval(fetchLiveBuses, 10000);
 </script>
