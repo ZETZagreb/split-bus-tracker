@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Promet Split - Live Autobusi</title>
+    <title>Promet Split - Live Autobusi sa voznim redom</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -142,14 +142,6 @@
             font-size: 12px;
             text-align: center;
         }
-        
-        .timetable-info {
-            font-size: 11px;
-            color: #aaa;
-            margin-top: 5px;
-            padding-top: 5px;
-            border-top: 1px solid #444;
-        }
     </style>
 </head>
 <body>
@@ -186,6 +178,98 @@
     var stopMarkers = [];
     var stopsVisible = true;
     var timetables = {};
+    
+    // Ključne točke za prepoznavanje polaska
+    const KEY_STOPS = {
+        SUKOISAN: { lat: 43.5156, lng: 16.4433, name: "Terminal Sukoišan" },
+        TROGIR: { lat: 43.5175, lng: 16.2515, name: "Trogir" },
+        AIRPORT: { lat: 43.5350, lng: 16.2992, name: "Zračna luka" }
+    };
+    
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+    
+    function getDayType() {
+        const day = new Date().getDay();
+        if (day === 0) return "sunday";
+        if (day === 6) return "saturday";
+        return "weekday";
+    }
+    
+    function findClosestSchedule(currentMinutes, schedules) {
+        let closest = null;
+        let minDiff = Infinity;
+        
+        for (let departure of schedules) {
+            const [depHour, depMin] = departure.split(":").map(Number);
+            const depMinutes = depHour * 60 + depMin;
+            const diff = Math.abs(currentMinutes - depMinutes);
+            if (diff < minDiff && diff <= 30) {
+                minDiff = diff;
+                closest = departure;
+            }
+        }
+        return closest ? { time: closest, minutesDiff: minDiff } : null;
+    }
+    
+    function findMatchingSchedule(bus) {
+        const lineNumber = bus.name;
+        if (!timetables[lineNumber]) return null;
+        
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const dayType = getDayType();
+        
+        const distToSplit = calculateDistance(bus.latitude, bus.longitude, KEY_STOPS.SUKOISAN.lat, KEY_STOPS.SUKOISAN.lng);
+        const distToTrogir = calculateDistance(bus.latitude, bus.longitude, KEY_STOPS.TROGIR.lat, KEY_STOPS.TROGIR.lng);
+        const distToAirport = calculateDistance(bus.latitude, bus.longitude, KEY_STOPS.AIRPORT.lat, KEY_STOPS.AIRPORT.lng);
+        
+        // Ako je autobus na Sukojišanu (Terminal) – kreće prema Trogiru ili Zračnoj luci
+        if (distToSplit < 300) {
+            const variant = timetables[lineNumber].variants?.to_trogir || Object.values(timetables[lineNumber].variants)[0];
+            const schedules = variant.schedules[dayType];
+            if (schedules) {
+                const closest = findClosestSchedule(currentMinutes, schedules);
+                if (closest && closest.minutesDiff < 10) {
+                    return {
+                        schedule: closest.time,
+                        destination: variant.destination,
+                        direction: variant.direction,
+                        from: "Sukoišan",
+                        minutesDiff: closest.minutesDiff
+                    };
+                }
+            }
+        }
+        
+        // Ako je autobus blizu Trogira – vjerojatno ide prema Splitu
+        if (distToTrogir < 1000 && distToSplit > 5000) {
+            const variant = timetables[lineNumber].variants?.from_trogir || Object.values(timetables[lineNumber].variants)[0];
+            const schedules = variant.schedules[dayType];
+            if (schedules) {
+                const closest = findClosestSchedule(currentMinutes, schedules);
+                if (closest && closest.minutesDiff < 15) {
+                    return {
+                        schedule: closest.time,
+                        destination: variant.destination,
+                        direction: variant.direction,
+                        from: "Trogir",
+                        minutesDiff: closest.minutesDiff
+                    };
+                }
+            }
+        }
+        
+        return null;
+    }
     
     // ============================================================
     // 3. FUNKCIJE ZA STANICE
@@ -254,7 +338,7 @@
     }
     
     // ============================================================
-    // 5. LIVE AUTOBUSI (jednostavno – bez lažnih podataka)
+    // 5. LIVE AUTOBUSI
     // ============================================================
     function formatTime(dateString) {
         if (!dateString) return "?";
@@ -262,7 +346,7 @@
         return date.toLocaleTimeString('hr-HR', {hour:'2-digit', minute:'2-digit'});
     }
     
-    function fetchBusDetails(garageNumber, marker, lineName) {
+    function fetchBusDetails(garageNumber, marker, bus) {
         var timestamp = Date.now();
         var url = `https://www.bus-split.com/api/vehicles/details?id=${garageNumber}&t=${timestamp}`;
         
@@ -273,21 +357,46 @@
                 var expectedTime = formatTime(data.expectedArrivalTime);
                 var plannedTime = formatTime(data.plannedArrivalTime);
                 
+                // Pokušaj pronaći polazak u voznom redu prema lokaciji
+                var scheduleInfo = findMatchingSchedule(bus);
+                var scheduleText = "";
+                if (scheduleInfo) {
+                    scheduleText = `<br><hr style="border-color:#444; margin:5px 0"><b>📅 Prema voznom redu:</b><br>
+                                    Polazak iz ${scheduleInfo.from}: ${scheduleInfo.schedule}<br>
+                                    Smjer: ${scheduleInfo.direction} → ${scheduleInfo.destination}`;
+                    if (scheduleInfo.minutesDiff === 0) {
+                        scheduleText += `<br><span style="color:#00ff00">▶ Upravo kreće!</span>`;
+                    } else if (scheduleInfo.minutesDiff < 0) {
+                        scheduleText += `<br><span style="color:#ffaa00">Krenuo prije ${Math.abs(scheduleInfo.minutesDiff)} min</span>`;
+                    } else {
+                        scheduleText += `<br><span style="color:#ffaa00">Kreće za ${scheduleInfo.minutesDiff} min</span>`;
+                    }
+                }
+                
                 var popupContent = `
                     <b>Gbr: ${garageNumber}</b><br>
-                    <b>Linija: ${data.name || lineName}</b><br>
+                    <b>Linija: ${data.name || bus.name}</b><br>
                     <b>Smjer vožnje: ${smjer}</b><br>
                     <b>Dolazak na sljedeću stanicu:</b> ${expectedTime} (plan: ${plannedTime})
+                    ${scheduleText}
                 `;
                 marker.bindPopup(popupContent).openPopup();
             })
             .catch(error => {
                 console.error("Greška:", error);
+                var scheduleInfo = findMatchingSchedule(bus);
+                var scheduleText = "";
+                if (scheduleInfo) {
+                    scheduleText = `<br><hr style="border-color:#444; margin:5px 0"><b>📅 Prema voznom redu:</b><br>
+                                    Polazak iz ${scheduleInfo.from}: ${scheduleInfo.schedule}<br>
+                                    Smjer: ${scheduleInfo.direction} → ${scheduleInfo.destination}`;
+                }
                 marker.bindPopup(`
                     <b>Gbr: ${garageNumber}</b><br>
-                    <b>Linija: ${lineName}</b><br>
+                    <b>Linija: ${bus.name}</b><br>
                     <b>Smjer vožnje: Nepoznat</b><br>
                     <i>Podaci o vremenu dolaska trenutno nisu dostupni</i>
+                    ${scheduleText}
                 `).openPopup();
             });
     }
@@ -309,7 +418,7 @@
                     markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
                 } else {
                     var marker = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
-                    marker.on('click', () => fetchBusDetails(bus.garageNumber, marker, bus.name));
+                    marker.on('click', () => fetchBusDetails(bus.garageNumber, marker, bus));
                     markers[bus.garageNumber] = marker;
                     
                     marker.bindPopup(`
