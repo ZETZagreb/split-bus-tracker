@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Promet Split - Live Autobusi sa voznim redom</title>
+    <title>Promet Split - Live Autobusi</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -142,6 +142,14 @@
             font-size: 12px;
             text-align: center;
         }
+        
+        .timetable-info {
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 5px;
+            padding-top: 5px;
+            border-top: 1px solid #444;
+        }
     </style>
 </head>
 <body>
@@ -229,7 +237,7 @@
     }
     
     // ============================================================
-    // 4. UČITAVANJE VOZNOG REDA IZ JSON DATOTEKE
+    // 4. UČITAVANJE VOZNOG REDA
     // ============================================================
     function loadTimetables() {
         fetch('timetables.json')
@@ -246,52 +254,7 @@
     }
     
     // ============================================================
-    // 5. FUNKCIJE ZA VOZNI RED (ODREĐIVANJE SMJERA)
-    // ============================================================
-    function getDayType() {
-        const day = new Date().getDay();
-        if (day === 0) return "sunday";
-        if (day === 6) return "saturday";
-        return "weekday";
-    }
-    
-    function getScheduleForLine(lineNumber, currentTime) {
-        if (!timetables || !timetables[lineNumber]) return null;
-        
-        const timetable = timetables[lineNumber];
-        const variant = Object.values(timetable.variants)[0];
-        const schedules = variant.schedules[getDayType()];
-        if (!schedules || schedules.length === 0) return null;
-        
-        const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-        let closest = null;
-        let minDiff = Infinity;
-        
-        for (let departure of schedules) {
-            const [depHour, depMin] = departure.split(":").map(Number);
-            const depMinutes = depHour * 60 + depMin;
-            let diff = Math.abs(currentMinutes - depMinutes);
-            if (diff > 720) diff = 1440 - diff;
-            
-            if (diff < minDiff && diff <= 30) {
-                minDiff = diff;
-                closest = departure;
-            }
-        }
-        
-        if (closest) {
-            return {
-                destination: variant.destination,
-                direction: variant.direction,
-                departureTime: closest,
-                minutesToDeparture: minDiff
-            };
-        }
-        return null;
-    }
-    
-    // ============================================================
-    // 6. LIVE AUTOBUSI
+    // 5. LIVE AUTOBUSI (jednostavno – bez lažnih podataka)
     // ============================================================
     function formatTime(dateString) {
         if (!dateString) return "?";
@@ -299,7 +262,7 @@
         return date.toLocaleTimeString('hr-HR', {hour:'2-digit', minute:'2-digit'});
     }
     
-    function fetchBusDetails(garageNumber, marker, lineName, lat, lng) {
+    function fetchBusDetails(garageNumber, marker, lineName) {
         var timestamp = Date.now();
         var url = `https://www.bus-split.com/api/vehicles/details?id=${garageNumber}&t=${timestamp}`;
         
@@ -310,35 +273,21 @@
                 var expectedTime = formatTime(data.expectedArrivalTime);
                 var plannedTime = formatTime(data.plannedArrivalTime);
                 
-                var currentTime = new Date();
-                var scheduleInfo = getScheduleForLine(lineName, currentTime);
-                var scheduleText = "";
-                if (scheduleInfo) {
-                    scheduleText = `<br><b>Prema voznom redu:</b> ${scheduleInfo.direction} → ${scheduleInfo.destination}<br><b>Polazak:</b> ${scheduleInfo.departureTime} (za ${scheduleInfo.minutesToDeparture} min)`;
-                }
-                
                 var popupContent = `
                     <b>Gbr: ${garageNumber}</b><br>
                     <b>Linija: ${data.name || lineName}</b><br>
-                    <b>Smjer (live): ${smjer}</b><br>
-                    <b>Dolazak:</b> ${expectedTime} (plan: ${plannedTime})
-                    ${scheduleText}
+                    <b>Smjer vožnje: ${smjer}</b><br>
+                    <b>Dolazak na sljedeću stanicu:</b> ${expectedTime} (plan: ${plannedTime})
                 `;
                 marker.bindPopup(popupContent).openPopup();
             })
             .catch(error => {
                 console.error("Greška:", error);
-                var currentTime = new Date();
-                var scheduleInfo = getScheduleForLine(lineName, currentTime);
-                var scheduleText = "";
-                if (scheduleInfo) {
-                    scheduleText = `<br><b>Prema voznom redu:</b> ${scheduleInfo.direction} → ${scheduleInfo.destination}<br><b>Polazak:</b> ${scheduleInfo.departureTime} (za ${scheduleInfo.minutesToDeparture} min)`;
-                }
                 marker.bindPopup(`
                     <b>Gbr: ${garageNumber}</b><br>
                     <b>Linija: ${lineName}</b><br>
-                    <b>Smjer (live): Nepoznat</b>
-                    ${scheduleText}
+                    <b>Smjer vožnje: Nepoznat</b><br>
+                    <i>Podaci o vremenu dolaska trenutno nisu dostupni</i>
                 `).openPopup();
             });
     }
@@ -360,13 +309,13 @@
                     markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
                 } else {
                     var marker = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
-                    marker.on('click', () => fetchBusDetails(bus.garageNumber, marker, bus.name, bus.latitude, bus.longitude));
+                    marker.on('click', () => fetchBusDetails(bus.garageNumber, marker, bus.name));
                     markers[bus.garageNumber] = marker;
                     
                     marker.bindPopup(`
                         <b>Gbr: ${bus.garageNumber}</b><br>
                         <b>Linija: ${bus.name}</b><br>
-                        <i>Kliknite za smjer i vrijeme...</i>
+                        <i>Kliknite za smjer i vrijeme dolaska</i>
                     `);
                 }
             });
@@ -389,7 +338,7 @@
     }
     
     // ============================================================
-    // 7. PRETRAGA (autobusi + stanice)
+    // 6. PRETRAGA
     // ============================================================
     function showSuggestions() {
         var val = document.getElementById('busSearch').value.toLowerCase().trim();
@@ -474,7 +423,7 @@
     }
     
     // ============================================================
-    // 8. POKRETANJE
+    // 7. POKRETANJE
     // ============================================================
     document.addEventListener('click', e => {
         var c = document.querySelector('.autocomplete-container');
@@ -486,7 +435,7 @@
     document.getElementById('toggleStopsBtn').onclick = toggleStops;
     
     loadStops();
-    loadTimetables();   // ← OVO SADA UČITAVA PRAVI JSON!
+    loadTimetables();
     fetchLiveBuses();
     setInterval(fetchLiveBuses, 10000);
 </script>
