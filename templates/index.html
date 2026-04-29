@@ -1,112 +1,320 @@
 <!DOCTYPE html>
-<html lang="hr">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Split Transit Tracker - Classic</title>
+    <title>Promet Split - Live Autobusi (sa smjerom)</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; height: 100vh; background: #f0f2f5; }
-        #header { background: #0055a4; padding: 15px; color: white; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000; }
-        #search { width: 90%; max-width: 500px; padding: 12px 20px; border-radius: 25px; border: none; font-size: 16px; outline: none; }
-        #map { flex-grow: 1; width: 100%; border-bottom: 3px solid #0055a4; }
-        #panel { height: 35%; overflow-y: auto; background: white; }
-        table { width: 100%; border-collapse: collapse; min-width: 600px; }
-        th { background: #343a40; color: white; padding: 12px; text-align: left; position: sticky; top: 0; }
-        td { padding: 12px; border-bottom: 1px solid #dee2e6; font-size: 14px; }
-        tr:hover { background-color: #f1f1f1; cursor: pointer; }
-        .gbr-badge { background: #212529; color: #ffc107; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-family: monospace; }
-        .line-badge { font-weight: bold; color: #0055a4; font-size: 16px; }
-        /* Stil za ikone na karti */
-        .bus-marker { background: #ffc107; border: 2px solid #212529; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #212529; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100%; }
+        .search-container {
+            position: absolute; 
+            top: 10px; 
+            left: 50px; 
+            z-index: 1000; 
+            background: white; 
+            padding: 10px; 
+            border-radius: 5px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            gap: 10px;
+        }
+        .autocomplete-container {
+            position: relative;
+        }
+        .autocomplete-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1001;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        .autocomplete-item:hover {
+            background-color: #f0f0f0;
+        }
+        .autocomplete-gbr {
+            font-weight: bold;
+            color: #ff6600;
+        }
+        .autocomplete-line {
+            color: #666;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        input { 
+            padding: 5px; 
+            width: 150px; 
+            border: 1px solid #ccc; 
+            border-radius: 3px; 
+        }
+        .stats {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+        .bus-label {
+            width: 55px;
+            height: 45px;
+            border: 2px solid #333;
+            border-radius: 6px;
+            overflow: hidden;
+            font-family: 'Arial Black', sans-serif;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+        .bus-top {
+            background: white;
+            color: #ff6600;
+            height: 22px;
+            line-height: 22px;
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+        }
+        .bus-bottom {
+            background: #ffcc00;
+            color: white;
+            height: 23px;
+            line-height: 23px;
+            font-weight: bold;
+            font-size: 12px;
+            text-align: center;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+        }
     </style>
 </head>
 <body>
-
-<div id="header">
-    <input type="text" id="search" placeholder="Pretraži GBR ili broj linije..." onkeyup="filterTable()">
+<div class="search-container">
+    <div class="autocomplete-container">
+        <input type="text" id="busSearch" placeholder="Gbr ili Linija..." onkeyup="showSuggestions()" autocomplete="off">
+        <div id="suggestionsList" class="autocomplete-list" style="display: none;"></div>
+    </div>
+    <span id="busCount" style="font-size:12px; color:#333; line-height:28px;"></span>
 </div>
-
+<div class="stats">
+    <span id="statsText">Učitavanje...</span>
+</div>
 <div id="map"></div>
-
-<div id="panel">
-    <table>
-        <thead>
-            <tr>
-                <th>GBR</th>
-                <th>Linija</th>
-                <th>Odredište</th>
-                <th>Model</th>
-            </tr>
-        </thead>
-        <tbody id="busTableBody"></tbody>
-    </table>
-</div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    var map = L.map('map').setView([43.5147, 16.4435], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    var map = L.map('map').setView([43.51, 16.44], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+    }).addTo(map);
     
     var markers = {};
-
-    function updateBuses() {
-        fetch('/api/vehicles')
+    var busDetails = {};
+    var lastUpdate = new Date();
+    
+    function formatTime(dateString) {
+        if (!dateString) return "?";
+        var date = new Date(dateString);
+        return date.toLocaleTimeString('hr-HR', {hour: '2-digit', minute:'2-digit'});
+    }
+    
+    function fetchBusDetails(garageNumber) {
+        var timestamp = Date.now();
+        fetch(`https://www.bus-split.com/api/vehicles/details?id=${garageNumber}&t=${timestamp}`)
             .then(response => response.json())
             .then(data => {
-                if (!Array.isArray(data)) return;
-
-                let tableHtml = "";
-                data.forEach(bus => {
-                    const lat = bus.latitude;
-                    const lon = bus.longitude;
-                    const gbr = bus.vehicleNumber || bus.label || "???";
-                    const line = bus.lineCode || "N/A";
-                    const id = bus.deviceId || bus.id;
-
-                    if (lat && lon) {
-                        // Ažuriranje markera na karti
-                        const icon = L.divIcon({
-                            className: 'bus-marker',
-                            html: `<div>${line}</div>`,
-                            iconSize: [35, 35],
-                            iconAnchor: [17, 17]
-                        });
-
-                        if (markers[id]) {
-                            markers[id].setLatLng([lat, lon]).setIcon(icon);
-                        } else {
-                            markers[id] = L.marker([lat, lon], {icon: icon}).addTo(map)
-                                .bindPopup(`<b>GBR: ${gbr}</b><br>Linija: ${line}<br>${bus.destination || ''}`);
-                        }
-
-                        // Generiranje retka u tablici
-                        tableHtml += `<tr onclick="map.setView([${lat}, ${lon}], 17); markers['${id}'].openPopup();">
-                            <td><span class="gbr-badge">${gbr}</span></td>
-                            <td><span class="line-badge">${line}</span></td>
-                            <td>${bus.destination || 'U prometu'}</td>
-                            <td><small>${bus.model || 'Autobus'}</small></td>
-                        </tr>`;
+                busDetails[garageNumber] = data;
+                if (markers[garageNumber]) {
+                    updatePopup(garageNumber);
+                }
+            })
+            .catch(err => console.error('Greška:', err));
+    }
+    
+    function updatePopup(garageNumber) {
+        var marker = markers[garageNumber];
+        var details = busDetails[garageNumber];
+        if (!marker || !details) return;
+        
+        var smjer = details.pathwayName || "?";
+        var expectedTime = formatTime(details.expectedArrivalTime);
+        var plannedTime = formatTime(details.plannedArrivalTime);
+        var delay = "";
+        if (details.expectedArrivalTime && details.plannedArrivalTime) {
+            var expected = new Date(details.expectedArrivalTime);
+            var planned = new Date(details.plannedArrivalTime);
+            var diffMin = Math.round((expected - planned) / 60000);
+            if (diffMin > 0) delay = ` (kašnjenje ${diffMin} min)`;
+            else if (diffMin < 0) delay = ` (${Math.abs(diffMin)} min ranije)`;
+        }
+        
+        marker.getPopup().setContent(`
+            <b>Gbr: ${garageNumber}</b><br>
+            <b>Linija: ${details.name || "?"}</b><br>
+            <b>Smjer: ${smjer}</b><br>
+            <b>Dolazak:</b> ${expectedTime} (plan: ${plannedTime})${delay}
+        `);
+    }
+    
+    function fetchLiveBuses() {
+        var timestamp = Date.now();
+        fetch(`https://www.bus-split.com/api/vehicles/live?t=${timestamp}`)
+            .then(response => response.json())
+            .then(data => {
+                var vehicles = data.vehicles;
+                var currentGbrs = vehicles.map(v => v.garageNumber);
+                
+                vehicles.forEach(bus => {
+                    var labelContent = `
+                        <div class="bus-label">
+                            <div class="bus-top">${bus.name}</div>
+                            <div class="bus-bottom">${bus.garageNumber}</div>
+                        </div>
+                    `;
+                    
+                    var icon = L.divIcon({ 
+                        html: labelContent, 
+                        className: '', 
+                        iconSize: [55, 45],
+                        iconAnchor: [27, 22]
+                    });
+                    
+                    if (markers[bus.garageNumber]) {
+                        markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
+                    } else {
+                        var marker = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
+                        marker.on('click', function(gbr) {
+                            return function() { fetchBusDetails(gbr); };
+                        }(bus.garageNumber));
+                        markers[bus.garageNumber] = marker;
+                    }
+                    
+                    markers[bus.garageNumber].bindPopup(`
+                        <b>Gbr: ${bus.garageNumber}</b><br>
+                        <b>Linija: ${bus.name}</b><br>
+                        <i>Kliknite za smjer i dolazak...</i>
+                    `);
+                    
+                    if (busDetails[bus.garageNumber]) {
+                        updatePopup(bus.garageNumber);
                     }
                 });
-                document.getElementById("busTableBody").innerHTML = tableHtml;
+                
+                for (var gbr in markers) { 
+                    if (!currentGbrs.includes(String(gbr))) { 
+                        map.removeLayer(markers[gbr]); 
+                        delete markers[gbr]; 
+                        delete busDetails[gbr];
+                    } 
+                }
+                
+                lastUpdate = new Date();
+                var vehicleCount = Object.keys(markers).length;
+                document.getElementById('statsText').innerHTML = `Ažurirano: ${lastUpdate.toLocaleTimeString('hr-HR')} | ${vehicleCount} vozila`;
+                document.getElementById('busCount').innerHTML = `${vehicleCount} vozila`;
             })
-            .catch(error => console.error("Greška pri ažuriranju:", error));
+            .catch(err => console.error('Greška:', err));
     }
-
-    function filterTable() {
-        let input = document.getElementById("search");
-        let filter = input.value.toLowerCase();
-        let rows = document.getElementById("busTableBody").getElementsByTagName("tr");
-
-        for (let i = 0; i < rows.length; i++) {
-            let text = rows[i].textContent.toLowerCase();
-            rows[i].style.display = text.includes(filter) ? "" : "none";
+    
+    function showSuggestions() {
+        var input = document.getElementById('busSearch');
+        var val = input.value.toLowerCase().trim();
+        var suggestionsDiv = document.getElementById('suggestionsList');
+        
+        if (val.length < 2) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+        
+        var suggestions = [];
+        for (var gbr in markers) {
+            var marker = markers[gbr];
+            var popupContent = marker.getPopup().getContent();
+            var gbrMatch = popupContent.match(/Gbr: (\d+)/);
+            var lineMatch = popupContent.match(/Linija: (\d+[A-Z]?)/);
+            var garageNumber = gbrMatch ? gbrMatch[1] : '';
+            var line = lineMatch ? lineMatch[1] : '';
+            
+            if (garageNumber.includes(val) || line.includes(val)) {
+                suggestions.push({ gbr: garageNumber, line: line, marker: marker });
+            }
+        }
+        
+        var uniqueSuggestions = [];
+        var seenGbr = {};
+        for (var i = 0; i < suggestions.length; i++) {
+            if (!seenGbr[suggestions[i].gbr]) {
+                seenGbr[suggestions[i].gbr] = true;
+                uniqueSuggestions.push(suggestions[i]);
+            }
+        }
+        
+        if (uniqueSuggestions.length > 0) {
+            suggestionsDiv.innerHTML = '';
+            for (var i = 0; i < Math.min(uniqueSuggestions.length, 10); i++) {
+                var item = uniqueSuggestions[i];
+                var div = document.createElement('div');
+                div.className = 'autocomplete-item';
+                div.innerHTML = `<span class="autocomplete-gbr">${item.gbr}</span><span class="autocomplete-line">Linija ${item.line}</span>`;
+                div.onclick = (function(gbr, marker) {
+                    return function() {
+                        document.getElementById('busSearch').value = gbr;
+                        suggestionsDiv.style.display = 'none';
+                        map.setView(marker.getLatLng(), 15);
+                        marker.openPopup();
+                        fetchBusDetails(gbr);
+                        filterBuses();
+                    };
+                })(item.gbr, item.marker);
+                suggestionsDiv.appendChild(div);
+            }
+            suggestionsDiv.style.display = 'block';
+        } else {
+            suggestionsDiv.style.display = 'none';
         }
     }
-
-    // Ažuriraj svakih 10 sekundi
-    setInterval(updateBuses, 10000);
-    updateBuses();
+    
+    function filterBuses() {
+        var val = document.getElementById('busSearch').value.toLowerCase();
+        var brojac = 0;
+        for (var gbr in markers) {
+            var marker = markers[gbr];
+            var popupContent = marker.getPopup().getContent();
+            if (popupContent.toLowerCase().includes(val)) {
+                marker.setOpacity(1);
+                brojac++;
+            } else {
+                marker.setOpacity(0.2);
+            }
+        }
+        document.getElementById('busCount').innerHTML = `${brojac} / ${Object.keys(markers).length} vozila`;
+    }
+    
+    document.addEventListener('click', function(e) {
+        var container = document.querySelector('.autocomplete-container');
+        if (container && !container.contains(e.target)) {
+            document.getElementById('suggestionsList').style.display = 'none';
+        }
+    });
+    
+    setInterval(fetchLiveBuses, 10000);
+    fetchLiveBuses();
 </script>
 </body>
 </html>
