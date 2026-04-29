@@ -1,52 +1,157 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Promet Split - Live Autobusi</title>
+    <title>Promet Split - Live Autobusi sa rutama i stanicama</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; padding: 0; }
         #map { height: 100vh; width: 100%; }
-        .search-container {
-            position: absolute; top: 10px; left: 50px; z-index: 1000;
-            background: white; padding: 10px; border-radius: 5px;
+        
+        .control-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            display: flex; gap: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
         }
-        .autocomplete-container { position: relative; }
+        
+        .control-panel button {
+            padding: 8px 12px;
+            background: #ff6600;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .control-panel button:hover {
+            background: #ff5500;
+        }
+        
+        .search-container {
+            position: absolute; 
+            top: 10px; 
+            left: 50px; 
+            z-index: 1000; 
+            background: white; 
+            padding: 10px; 
+            border-radius: 5px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            gap: 10px;
+        }
+        
+        .autocomplete-container {
+            position: relative;
+        }
+        
         .autocomplete-list {
-            position: absolute; top: 100%; left: 0; right: 0;
-            background: white; border: 1px solid #ccc; border-top: none;
-            border-radius: 0 0 5px 5px; max-height: 200px; overflow-y: auto;
-            z-index: 1001; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-radius: 0 0 5px 5px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1001;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
-        .autocomplete-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 13px; }
-        .autocomplete-item:hover { background-color: #f0f0f0; }
-        .autocomplete-gbr { font-weight: bold; color: #ff6600; }
-        .autocomplete-line { color: #666; font-size: 12px; margin-left: 10px; }
-        input { padding: 5px; width: 150px; border: 1px solid #ccc; border-radius: 3px; }
+        
+        .autocomplete-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+        
+        .autocomplete-item:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .autocomplete-gbr {
+            font-weight: bold;
+            color: #ff6600;
+        }
+        
+        .autocomplete-line {
+            color: #666;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        
+        input { 
+            padding: 5px; 
+            width: 180px; 
+            border: 1px solid #ccc; 
+            border-radius: 3px; 
+        }
+        
         .stats {
-            position: absolute; bottom: 10px; right: 10px; z-index: 1000;
-            background: rgba(0,0,0,0.7); color: white; padding: 5px 10px;
-            border-radius: 5px; font-size: 12px;
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
         }
+        
         .bus-label {
-            width: 55px; height: 45px; border: 2px solid #333;
-            border-radius: 6px; overflow: hidden;
+            width: 55px;
+            height: 45px;
+            border: 2px solid #333;
+            border-radius: 6px;
+            overflow: hidden;
             font-family: 'Arial Black', sans-serif;
             box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-            display: flex; flex-direction: column; background: white;
+            display: flex;
+            flex-direction: column;
             cursor: pointer;
         }
-        .bus-top { background: white; color: #ff6600; height: 22px; line-height: 22px; font-weight: bold; font-size: 14px; text-align: center; }
-        .bus-bottom { background: #ffcc00; color: white; height: 23px; line-height: 23px; font-weight: bold; font-size: 12px; text-align: center; }
+        
+        .bus-top {
+            background: white;
+            color: #ff6600;
+            height: 22px;
+            line-height: 22px;
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+        }
+        
+        .bus-bottom {
+            background: #ffcc00;
+            color: white;
+            height: 23px;
+            line-height: 23px;
+            font-weight: bold;
+            font-size: 12px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
+<div class="control-panel">
+    <button id="toggleStopsBtn">🔘 Sakrij stanice</button>
+    <button id="clearRoutesBtn">🗺️ Obriši rute</button>
+</div>
 <div class="search-container">
     <div class="autocomplete-container">
-        <input type="text" id="busSearch" placeholder="Gbr ili Linija..." onkeyup="showSuggestions()" autocomplete="off">
+        <input type="text" id="busSearch" placeholder="Gbr, Linija ili Stanica..." onkeyup="showSuggestions()" autocomplete="off">
         <div id="suggestionsList" class="autocomplete-list" style="display: none;"></div>
     </div>
     <span id="busCount" style="font-size:12px; color:#333; line-height:28px;"></span>
@@ -55,11 +160,171 @@
     <span id="statsText">Učitavanje...</span>
 </div>
 <div id="map"></div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     var map = L.map('map').setView([43.51, 16.44], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+    }).addTo(map);
+    
     var markers = {};
+    var allStops = [];
+    var stopMarkers = [];
+    var routeLayers = [];
+    var stopsVisible = true;
+    var routeColors = ['#ff0000', '#00ff00', '#0000ff', '#ffaa00', '#ff00ff', '#00ffff', '#ff6600'];
+    
+    function formatTime(dateString) {
+        if (!dateString) return "?";
+        var date = new Date(dateString);
+        return date.toLocaleTimeString('hr-HR', {hour:'2-digit', minute:'2-digit'});
+    }
+    
+    function loadStops() {
+        fetch('https://www.bus-split.com/api/stops')
+            .then(response => response.json())
+            .then(stops => {
+                allStops = stops;
+                if (stopsVisible) {
+                    addStopsToMap(stops);
+                }
+            })
+            .catch(err => console.error('Greška pri učitavanju stanica:', err));
+    }
+    
+    function addStopsToMap(stops) {
+        stops.forEach(stop => {
+            var lat = stop.geography.coordinates[1];
+            var lng = stop.geography.coordinates[0];
+            var routes = stop.routes.map(r => r.name).join(', ');
+            
+            var marker = L.circleMarker([lat, lng], {
+                radius: 4,
+                fillColor: "#3388ff",
+                color: "#fff",
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(map);
+            
+            marker.bindPopup(`<b>${stop.name}</b><br><b>Linije:</b> ${routes || 'Nema'}`);
+            stopMarkers.push(marker);
+        });
+    }
+    
+    function toggleStops() {
+        stopsVisible = !stopsVisible;
+        stopMarkers.forEach(marker => {
+            if (stopsVisible) {
+                map.addLayer(marker);
+            } else {
+                map.removeLayer(marker);
+            }
+        });
+        document.getElementById('toggleStopsBtn').innerHTML = stopsVisible ? '🔘 Sakrij stanice' : '🔘 Prikaži stanice';
+    }
+    
+    function clearRoutes() {
+        routeLayers.forEach(layer => map.removeLayer(layer));
+        routeLayers = [];
+    }
+    
+    function drawRoute(routeCoordinates, color) {
+        var polyline = L.polyline(routeCoordinates, { color: color, weight: 4, opacity: 0.7 }).addTo(map);
+        routeLayers.push(polyline);
+        return polyline;
+    }
+    
+    function loadAndDrawRoute(routeId, color) {
+        fetch(`https://www.bus-split.com/api/routes/${routeId}`)
+            .then(response => response.json())
+            .then(data => {
+                var coordinates = [];
+                if (data.routes && data.routes[0]) {
+                    coordinates = data.routes[0].map(coord => [coord[0], coord[1]]);
+                    drawRoute(coordinates, color);
+                }
+            })
+            .catch(err => console.error('Greška pri učitavanju rute:', err));
+    }
+    
+    function fetchBusDetails(garageNumber, marker, lineName) {
+        var timestamp = Date.now();
+        var url = `https://www.bus-split.com/api/vehicles/details?id=${garageNumber}&t=${timestamp}`;
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                var smjer = data.pathwayName || "Nepoznat smjer";
+                var expectedTime = formatTime(data.expectedArrivalTime);
+                var plannedTime = formatTime(data.plannedArrivalTime);
+                
+                var popupContent = `
+                    <b>Gbr: ${garageNumber}</b><br>
+                    <b>Linija: ${data.name || lineName}</b><br>
+                    <b>Smjer: ${smjer}</b><br>
+                    <b>Dolazak:</b> ${expectedTime} (plan: ${plannedTime})<br>
+                    <button onclick="showRouteAndStopsForLine('${data.name || lineName}')" style="margin-top:5px; padding:3px 8px; background:#ff6600; color:white; border:none; border-radius:3px; cursor:pointer;">🗺️ Pokaži rutu i stanice</button>
+                    <button onclick="showAllStopsForLine('${data.name || lineName}')" style="margin-top:5px; margin-left:5px; padding:3px 8px; background:#3388ff; color:white; border:none; border-radius:3px; cursor:pointer;">📋 Popis stanica</button>
+                `;
+                marker.bindPopup(popupContent).openPopup();
+            })
+            .catch(error => {
+                console.error("Greška:", error);
+                marker.bindPopup(`
+                    <b>Gbr: ${garageNumber}</b><br>
+                    <b>Linija: ${lineName}</b><br>
+                    <b>Smjer: Nepoznat</b><br>
+                    <button onclick="showRouteAndStopsForLine('${lineName}')" style="margin-top:5px; padding:3px 8px; background:#ff6600; color:white; border:none; border-radius:3px; cursor:pointer;">🗺️ Pokaži rutu i stanice</button>
+                    <button onclick="showAllStopsForLine('${lineName}')" style="margin-top:5px; margin-left:5px; padding:3px 8px; background:#3388ff; color:white; border:none; border-radius:3px; cursor:pointer;">📋 Popis stanica</button>
+                `).openPopup();
+            });
+    }
+    
+    function showRouteAndStopsForLine(lineNumber) {
+        clearRoutes();
+        var color = routeColors[Math.floor(Math.random() * routeColors.length)];
+        loadAndDrawRoute(lineNumber, color);
+        
+        var lineStops = allStops.filter(stop => 
+            stop.routes && stop.routes.some(r => r.name === lineNumber)
+        );
+        
+        lineStops.forEach(stop => {
+            var lat = stop.geography.coordinates[1];
+            var lng = stop.geography.coordinates[0];
+            var tempMarker = L.circleMarker([lat, lng], {
+                radius: 6,
+                fillColor: "#ff0000",
+                color: "#fff",
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.9
+            }).addTo(map);
+            routeLayers.push(tempMarker);
+            tempMarker.bindPopup(`<b>${stop.name}</b><br><b>Linija ${lineNumber}</b>`);
+        });
+        
+        document.getElementById('statsText').innerHTML = `Prikazana ruta i stanice za liniju ${lineNumber}`;
+        setTimeout(() => {
+            document.getElementById('statsText').innerHTML = `Ažurirano: ${new Date().toLocaleTimeString('hr-HR')}`;
+        }, 3000);
+    }
+    
+    function showAllStopsForLine(lineNumber) {
+        var lineStops = allStops.filter(stop => 
+            stop.routes && stop.routes.some(r => r.name === lineNumber)
+        );
+        
+        if (lineStops.length === 0) {
+            alert(`Nema pronađenih stanica za liniju ${lineNumber}`);
+            return;
+        }
+        
+        var stopList = lineStops.map((stop, idx) => `${idx+1}. ${stop.name}`).join('\n');
+        alert(`Stanice za liniju ${lineNumber}:\n\n${stopList}`);
+    }
     
     async function fetchLiveBuses() {
         try {
@@ -78,14 +343,15 @@
                     markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
                 } else {
                     var marker = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
+                    marker.on('click', () => fetchBusDetails(bus.garageNumber, marker, bus.name));
                     markers[bus.garageNumber] = marker;
+                    
+                    marker.bindPopup(`
+                        <b>Gbr: ${bus.garageNumber}</b><br>
+                        <b>Linija: ${bus.name}</b><br>
+                        <i>Kliknite za smjer i vrijeme...</i>
+                    `);
                 }
-                
-                markers[bus.garageNumber].bindPopup(`
-                    <b>Gbr: ${bus.garageNumber}</b><br>
-                    <b>Linija: ${bus.name}</b><br>
-                    <b>Reg: ${bus.registrationNumber}</b>
-                `);
             });
             
             for (var gbr in markers) { 
@@ -108,34 +374,65 @@
         var val = document.getElementById('busSearch').value.toLowerCase().trim();
         var div = document.getElementById('suggestionsList');
         if (val.length < 2) { div.style.display = 'none'; return; }
+        
         var suggestions = [];
+        
         for (var gbr in markers) {
             var popup = markers[gbr].getPopup().getContent();
             var gbrMatch = popup.match(/Gbr: (\d+)/);
             var lineMatch = popup.match(/Linija: (\d+[A-Z]?)/);
             if (gbrMatch && (gbrMatch[1].includes(val) || (lineMatch && lineMatch[1].includes(val)))) {
-                suggestions.push({ gbr: gbrMatch[1], line: lineMatch ? lineMatch[1] : '', marker: markers[gbr] });
+                suggestions.push({ type: 'bus', gbr: gbrMatch[1], line: lineMatch ? lineMatch[1] : '', marker: markers[gbr] });
             }
         }
+        
+        allStops.forEach(stop => {
+            if (stop.name.toLowerCase().includes(val)) {
+                suggestions.push({ type: 'stop', name: stop.name, stop: stop });
+            }
+        });
+        
+        var unique = [];
         var seen = {};
-        suggestions = suggestions.filter(s => { if (seen[s.gbr]) return false; seen[s.gbr] = true; return true; });
-        if (suggestions.length > 0) {
+        for (var i = 0; i < suggestions.length; i++) {
+            var key = suggestions[i].type === 'bus' ? suggestions[i].gbr : suggestions[i].name;
+            if (!seen[key]) {
+                seen[key] = true;
+                unique.push(suggestions[i]);
+            }
+        }
+        
+        if (unique.length > 0) {
             div.innerHTML = '';
-            suggestions.slice(0, 10).forEach(item => {
+            unique.slice(0, 10).forEach(item => {
                 var d = document.createElement('div');
                 d.className = 'autocomplete-item';
-                d.innerHTML = `<span class="autocomplete-gbr">${item.gbr}</span><span class="autocomplete-line">Linija ${item.line}</span>`;
-                d.onclick = () => {
-                    document.getElementById('busSearch').value = item.gbr;
-                    div.style.display = 'none';
-                    map.setView(item.marker.getLatLng(), 15);
-                    item.marker.openPopup();
-                    filterBuses();
-                };
+                if (item.type === 'bus') {
+                    d.innerHTML = `<span class="autocomplete-gbr">🚌 ${item.gbr}</span><span class="autocomplete-line">Linija ${item.line}</span>`;
+                    d.onclick = () => {
+                        document.getElementById('busSearch').value = item.gbr;
+                        div.style.display = 'none';
+                        map.setView(item.marker.getLatLng(), 15);
+                        item.marker.openPopup();
+                        filterBuses();
+                    };
+                } else {
+                    d.innerHTML = `<span class="autocomplete-gbr">📍 ${item.name}</span>`;
+                    d.onclick = () => {
+                        document.getElementById('busSearch').value = item.name;
+                        div.style.display = 'none';
+                        var lat = item.stop.geography.coordinates[1];
+                        var lng = item.stop.geography.coordinates[0];
+                        map.setView([lat, lng], 15);
+                        filterBuses();
+                    };
+                }
                 div.appendChild(d);
             });
             div.style.display = 'block';
-        } else div.style.display = 'none';
+        } else {
+            div.style.display = 'none';
+        }
     }
     
     function filterBuses() {
@@ -143,17 +440,27 @@
         var brojac = 0;
         for (var gbr in markers) {
             var popup = markers[gbr].getPopup().getContent();
-            if (popup.toLowerCase().includes(val)) { markers[gbr].setOpacity(1); brojac++; }
-            else markers[gbr].setOpacity(0.2);
+            if (popup.toLowerCase().includes(val)) {
+                markers[gbr].setOpacity(1);
+                brojac++;
+            } else {
+                markers[gbr].setOpacity(0.2);
+            }
         }
         document.getElementById('busCount').innerHTML = `${brojac} / ${Object.keys(markers).length} vozila`;
     }
     
     document.addEventListener('click', e => {
         var c = document.querySelector('.autocomplete-container');
-        if (c && !c.contains(e.target)) document.getElementById('suggestionsList').style.display = 'none';
+        if (c && !c.contains(e.target)) {
+            document.getElementById('suggestionsList').style.display = 'none';
+        }
     });
     
+    document.getElementById('toggleStopsBtn').onclick = toggleStops;
+    document.getElementById('clearRoutesBtn').onclick = clearRoutes;
+    
+    loadStops();
     fetchLiveBuses();
     setInterval(fetchLiveBuses, 10000);
 </script>
