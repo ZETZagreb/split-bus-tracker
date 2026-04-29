@@ -61,43 +61,6 @@
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
     var markers = {};
     
-    function formatTime(dateString) {
-        if (!dateString) return "?";
-        var date = new Date(dateString);
-        return date.toLocaleTimeString('hr-HR', {hour:'2-digit', minute:'2-digit'});
-    }
-    
-    async function fetchAndShowDetails(garageNumber, marker) {
-        var timestamp = Date.now();
-        var url = `https://www.bus-split.com/api/vehicles/details?id=${garageNumber}&t=${timestamp}`;
-        
-        try {
-            var response = await fetch(url);
-            var data = await response.json();
-            
-            var smjer = data.pathwayName || "Nepoznat smjer";
-            var expectedTime = formatTime(data.expectedArrivalTime);
-            var plannedTime = formatTime(data.plannedArrivalTime);
-            var lineName = data.name || "?";
-            
-            var popupContent = `
-                <b>Gbr: ${garageNumber}</b><br>
-                <b>Linija: ${lineName}</b><br>
-                <b>Smjer: ${smjer}</b><br>
-                <b>Dolazak:</b> ${expectedTime} (plan: ${plannedTime})
-            `;
-            
-            marker.bindPopup(popupContent).openPopup();
-        } catch (error) {
-            console.error("Greška pri dohvatu detalja:", error);
-            marker.bindPopup(`
-                <b>Gbr: ${garageNumber}</b><br>
-                <b>Greška pri dohvatu podataka</b><br>
-                Pokušajte ponovo kasnije.
-            `).openPopup();
-        }
-    }
-    
     async function fetchLiveBuses() {
         try {
             var response = await fetch(`https://www.bus-split.com/api/vehicles/live?t=${Date.now()}`);
@@ -115,15 +78,14 @@
                     markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
                 } else {
                     var marker = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
-                    marker.on('click', () => fetchAndShowDetails(bus.garageNumber, marker));
                     markers[bus.garageNumber] = marker;
-                    
-                    marker.bindPopup(`
-                        <b>Gbr: ${bus.garageNumber}</b><br>
-                        <b>Linija: ${bus.name}</b><br>
-                        <i>Učitavam podatke...</i>
-                    `);
                 }
+                
+                markers[bus.garageNumber].bindPopup(`
+                    <b>Gbr: ${bus.garageNumber}</b><br>
+                    <b>Linija: ${bus.name}</b><br>
+                    <b>Reg: ${bus.registrationNumber}</b>
+                `);
             });
             
             for (var gbr in markers) { 
@@ -137,7 +99,7 @@
             document.getElementById('statsText').innerHTML = `Ažurirano: ${new Date().toLocaleTimeString('hr-HR')} | ${vehicleCount} vozila`;
             document.getElementById('busCount').innerHTML = `${vehicleCount} vozila`;
         } catch (error) {
-            console.error("Greška pri dohvatu vozila:", error);
+            console.error("Greška:", error);
             document.getElementById('statsText').innerHTML = 'Greška pri učitavanju';
         }
     }
@@ -168,7 +130,6 @@
                     div.style.display = 'none';
                     map.setView(item.marker.getLatLng(), 15);
                     item.marker.openPopup();
-                    fetchAndShowDetails(item.gbr, item.marker);
                     filterBuses();
                 };
                 div.appendChild(d);
