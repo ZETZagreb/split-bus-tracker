@@ -2,29 +2,43 @@
 <html lang="hr">
 <head>
     <meta charset="UTF-8">
-    <title>Split Transit Tracker</title>
+    <title>Split Transit Tracker - Classic</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
-        #header { background: #0055a4; padding: 12px; z-index: 1000; text-align: center; }
-        #search { width: 100%; max-width: 400px; padding: 10px; border-radius: 20px; border: none; outline: none; }
-        #map { flex-grow: 1; }
-        #panel { height: 35%; overflow-y: auto; background: white; border-top: 2px solid #333; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
-        th { background: #f8f9fa; position: sticky; top: 0; }
-        .gbr-label { background: #222; color: #ffc107; padding: 3px 7px; border-radius: 4px; font-weight: bold; font-family: monospace; }
-        .bus-icon { width: 40px!important; height: 40px!important; border-radius: 50%; border: 2px solid #333; background: #ffeb3b; display: flex; align-items: center; justify-content: center; font-weight: bold; color: black; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; height: 100vh; background: #f0f2f5; }
+        #header { background: #0055a4; padding: 15px; color: white; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000; }
+        #search { width: 90%; max-width: 500px; padding: 12px 20px; border-radius: 25px; border: none; font-size: 16px; outline: none; }
+        #map { flex-grow: 1; width: 100%; border-bottom: 3px solid #0055a4; }
+        #panel { height: 35%; overflow-y: auto; background: white; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th { background: #343a40; color: white; padding: 12px; text-align: left; position: sticky; top: 0; }
+        td { padding: 12px; border-bottom: 1px solid #dee2e6; font-size: 14px; }
+        tr:hover { background-color: #f1f1f1; cursor: pointer; }
+        .gbr-badge { background: #212529; color: #ffc107; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-family: monospace; }
+        .line-badge { font-weight: bold; color: #0055a4; font-size: 16px; }
+        /* Stil za ikone na karti */
+        .bus-marker { background: #ffc107; border: 2px solid #212529; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #212529; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
 
-<div id="header"><input type="text" id="search" placeholder="Pretraži vozilo ili liniju..." onkeyup="filter()"></div>
+<div id="header">
+    <input type="text" id="search" placeholder="Pretraži GBR ili broj linije..." onkeyup="filterTable()">
+</div>
+
 <div id="map"></div>
+
 <div id="panel">
     <table>
-        <thead><tr><th>GBR</th><th>Model</th><th>Linija</th><th>Odredište</th></tr></thead>
-        <tbody id="busBody"></tbody>
+        <thead>
+            <tr>
+                <th>GBR</th>
+                <th>Linija</th>
+                <th>Odredište</th>
+                <th>Model</th>
+            </tr>
+        </thead>
+        <tbody id="busTableBody"></tbody>
     </table>
 </div>
 
@@ -32,56 +46,67 @@
 <script>
     var map = L.map('map').setView([43.5147, 16.4435], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    
     var markers = {};
 
-    function update() {
-        fetch('/api/vehicles').then(r => r.json()).then(data => {
-            if (!Array.isArray(data)) return;
-            let html = "";
+    function updateBuses() {
+        fetch('/api/vehicles')
+            .then(response => response.json())
+            .then(data => {
+                if (!Array.isArray(data)) return;
 
-            data.forEach(bus => {
-                let id = bus.deviceId || bus.id;
-                let gbr = bus.vehicleNumber || bus.label || "???";
-                let line = bus.lineCode || "---";
-                let lat = bus.latitude, lon = bus.longitude;
+                let tableHtml = "";
+                data.forEach(bus => {
+                    const lat = bus.latitude;
+                    const lon = bus.longitude;
+                    const gbr = bus.vehicleNumber || bus.label || "???";
+                    const line = bus.lineCode || "N/A";
+                    const id = bus.deviceId || bus.id;
 
-                if (lat && lon) {
-                    // Marker s brojem linije
-                    let icon = L.divIcon({ 
-                        html: `<div class="bus-icon">${line}</div>`, 
-                        className: '', 
-                        iconSize: [40, 40], 
-                        iconAnchor: [20, 20] 
-                    });
+                    if (lat && lon) {
+                        // Ažuriranje markera na karti
+                        const icon = L.divIcon({
+                            className: 'bus-marker',
+                            html: `<div>${line}</div>`,
+                            iconSize: [35, 35],
+                            iconAnchor: [17, 17]
+                        });
 
-                    if (markers[id]) {
-                        markers[id].setLatLng([lat, lon]).setIcon(icon);
-                    } else {
-                        markers[id] = L.marker([lat, lon], {icon: icon}).addTo(map)
-                            .bindPopup(`<b>GBR: ${gbr}</b><br>Linija: ${line}<br>${bus.destination || ''}`);
+                        if (markers[id]) {
+                            markers[id].setLatLng([lat, lon]).setIcon(icon);
+                        } else {
+                            markers[id] = L.marker([lat, lon], {icon: icon}).addTo(map)
+                                .bindPopup(`<b>GBR: ${gbr}</b><br>Linija: ${line}<br>${bus.destination || ''}`);
+                        }
+
+                        // Generiranje retka u tablici
+                        tableHtml += `<tr onclick="map.setView([${lat}, ${lon}], 17); markers['${id}'].openPopup();">
+                            <td><span class="gbr-badge">${gbr}</span></td>
+                            <td><span class="line-badge">${line}</span></td>
+                            <td>${bus.destination || 'U prometu'}</td>
+                            <td><small>${bus.model || 'Autobus'}</small></td>
+                        </tr>`;
                     }
-
-                    html += `<tr onclick="map.setView([${lat}, ${lon}], 17)">
-                        <td><span class="gbr-label">${gbr}</span></td>
-                        <td>${bus.model || 'Autobus'}</td>
-                        <td><b>${line}</b></td>
-                        <td>${bus.destination || 'U prometu'}</td>
-                    </tr>`;
-                }
-            });
-            document.getElementById("busBody").innerHTML = html;
-        }).catch(err => console.error("API Error"));
+                });
+                document.getElementById("busTableBody").innerHTML = tableHtml;
+            })
+            .catch(error => console.error("Greška pri ažuriranju:", error));
     }
 
-    function filter() {
-        let v = document.getElementById("search").value.toLowerCase();
-        document.querySelectorAll("#busBody tr").forEach(r => {
-            r.style.display = r.innerText.toLowerCase().includes(v) ? "" : "none";
-        });
+    function filterTable() {
+        let input = document.getElementById("search");
+        let filter = input.value.toLowerCase();
+        let rows = document.getElementById("busTableBody").getElementsByTagName("tr");
+
+        for (let i = 0; i < rows.length; i++) {
+            let text = rows[i].textContent.toLowerCase();
+            rows[i].style.display = text.includes(filter) ? "" : "none";
+        }
     }
 
-    setInterval(update, 10000);
-    update();
+    // Ažuriraj svakih 10 sekundi
+    setInterval(updateBuses, 10000);
+    updateBuses();
 </script>
 </body>
 </html>
