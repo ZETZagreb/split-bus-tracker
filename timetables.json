@@ -1,0 +1,14 @@
+"linija_broj": {
+  "name": "Naziv linije",
+  "variants": {
+    "full": {
+      "destination": "Odredište",
+      "direction": "Smjer",
+      "schedules": {
+        "weekday": ["05:00","06:00"],
+        "saturday": ["05:30","06:30"],
+        "sunday": ["06:00","07:00"]
+      }
+    }
+  }
+}
