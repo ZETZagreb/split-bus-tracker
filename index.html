@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Promet Split - Live Autobusi sa svim stanicama</title>
+    <title>Promet Split - Live Autobusi sa voznim redom</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -162,22 +162,65 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+    // ============================================================
+    // 1. INICIJALIZACIJA KARTE
+    // ============================================================
     var map = L.map('map').setView([43.51, 16.44], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
     }).addTo(map);
     
+    // ============================================================
+    // 2. GLAVNE VARIJABLE
+    // ============================================================
     var markers = {};
     var allStops = [];
     var stopMarkers = [];
     var stopsVisible = true;
+    var timetables = {};
+    var lastUpdate = new Date();
     
-    function formatTime(dateString) {
-        if (!dateString) return "?";
-        var date = new Date(dateString);
-        return date.toLocaleTimeString('hr-HR', {hour:'2-digit', minute:'2-digit'});
-    }
+    // ============================================================
+    // 3. VOZNI REDOVI (ugrađeni u kod)
+    // ============================================================
+    var TIMETABLES_DATA = {
+      "1": {
+        "name": "BUNJE - POLJIČKA - HNK - DOM. RATA - BUNJE",
+        "variants": {
+          "full": {
+            "destination": "BUNJE",
+            "direction": "kružna",
+            "schedules": {
+              "weekday": ["04:50","05:20","05:50","06:20","06:50","06:55","07:05","07:30","07:45","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","23:00"],
+              "saturday": ["04:00","04:30","05:00","05:30","06:00","06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","23:00"],
+              "sunday": ["04:30","05:30","06:30","07:00","07:30","08:30","09:30","10:30","11:30","12:30","13:30","14:30","15:30","16:30","17:30","18:30","19:30","20:30","21:30","22:30","23:30"]
+            }
+          }
+        }
+      },
+      "37": {
+        "name": "SPLIT - TROGIR (preko Airport)",
+        "variants": {
+          "to_trogir": {
+            "destination": "TROGIR",
+            "direction": "Split -> Trogir",
+            "schedules": {
+              "weekday": ["04:00","04:30","05:10","05:30","05:50","06:10","06:30","06:50","07:10","07:30","07:50","08:10","08:30","08:50","09:10","09:30","09:50","10:10","10:30","10:50","11:10","11:30","11:50","12:10","12:30","12:50","13:10","13:30","13:50","14:10","14:30","14:50","15:10","15:30","15:50","16:10","16:30","16:50","17:10","17:30","17:50","18:10","18:30","18:50","19:10","19:30","19:50","20:10","20:30","21:00","21:30","22:05","22:30","23:30","00:15"],
+              "saturday": ["04:30","05:00","05:30","06:00","06:30","07:00","07:30","08:00","08:30","08:50","09:10","09:30","09:50","10:10","10:30","10:50","11:10","11:30","11:50","12:10","12:30","12:50","13:10","13:30","13:50","14:10","14:30","15:10","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:05","22:30","23:00","23:30","00:15"],
+              "sunday": ["04:30","05:00","05:30","06:00","06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:05","22:30","23:00","23:30","00:15"]
+            }
+          }
+        }
+      }
+    };
     
+    // Učitaj timetables (koristi ugrađene podatke, ali može i vanjski JSON)
+    timetables = TIMETABLES_DATA;
+    console.log("Vozni redovi učitani:", Object.keys(timetables));
+    
+    // ============================================================
+    // 4. FUNKCIJE ZA STANICE (koristi tvoj stops.json)
+    // ============================================================
     function loadStops() {
         fetch('stops.json')
             .then(response => response.json())
@@ -185,7 +228,6 @@
                 allStops = stops;
                 addStopsToMap(stops);
                 console.log(`Učitano ${stops.length} stanica`);
-                document.getElementById('statsText').innerHTML = `Učitano ${stops.length} stanica | Ažuriranje...`;
             })
             .catch(err => {
                 console.error('Greška pri učitavanju stanica:', err);
@@ -200,10 +242,10 @@
             var routes = stop.routes ? stop.routes.map(r => r.name).join(', ') : '';
             
             var marker = L.circleMarker([lat, lng], {
-                radius: 4,
+                radius: 6,
                 fillColor: "#3388ff",
                 color: "#fff",
-                weight: 1,
+                weight: 2,
                 opacity: 1,
                 fillOpacity: 0.8
             }).addTo(map);
@@ -225,7 +267,61 @@
         document.getElementById('toggleStopsBtn').innerHTML = stopsVisible ? '🔘 Sakrij stanice' : '🔘 Prikaži stanice';
     }
     
-    function fetchBusDetails(garageNumber, marker, lineName) {
+    // ============================================================
+    // 5. FUNKCIJE ZA VOZNI RED (ODREĐIVANJE SMJERA)
+    // ============================================================
+    function getDayType() {
+        const day = new Date().getDay();
+        if (day === 0) return "sunday";
+        if (day === 6) return "saturday";
+        return "weekday";
+    }
+    
+    function getScheduleForLine(lineNumber, currentTime) {
+        const timetable = timetables[lineNumber];
+        if (!timetable) return null;
+        
+        const variant = Object.values(timetable.variants)[0];
+        const schedules = variant.schedules[getDayType()];
+        if (!schedules || schedules.length === 0) return null;
+        
+        const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+        let closest = null;
+        let minDiff = Infinity;
+        
+        for (let departure of schedules) {
+            const [depHour, depMin] = departure.split(":").map(Number);
+            const depMinutes = depHour * 60 + depMin;
+            let diff = Math.abs(currentMinutes - depMinutes);
+            if (diff > 720) diff = 1440 - diff;
+            
+            if (diff < minDiff && diff <= 30) {
+                minDiff = diff;
+                closest = departure;
+            }
+        }
+        
+        if (closest) {
+            return {
+                destination: variant.destination,
+                direction: variant.direction,
+                departureTime: closest,
+                minutesToDeparture: minDiff
+            };
+        }
+        return null;
+    }
+    
+    // ============================================================
+    // 6. LIVE AUTOBUSI
+    // ============================================================
+    function formatTime(dateString) {
+        if (!dateString) return "?";
+        var date = new Date(dateString);
+        return date.toLocaleTimeString('hr-HR', {hour:'2-digit', minute:'2-digit'});
+    }
+    
+    function fetchBusDetails(garageNumber, marker, lineName, lat, lng) {
         var timestamp = Date.now();
         var url = `https://www.bus-split.com/api/vehicles/details?id=${garageNumber}&t=${timestamp}`;
         
@@ -236,20 +332,36 @@
                 var expectedTime = formatTime(data.expectedArrivalTime);
                 var plannedTime = formatTime(data.plannedArrivalTime);
                 
+                // Pokušaj odrediti smjer prema voznom redu
+                var currentTime = new Date();
+                var scheduleInfo = getScheduleForLine(lineName, currentTime);
+                var scheduleText = "";
+                if (scheduleInfo) {
+                    scheduleText = `<br><b>Prema voznom redu:</b> ${scheduleInfo.direction} → ${scheduleInfo.destination}<br><b>Polazak:</b> ${scheduleInfo.departureTime} (za ${scheduleInfo.minutesToDeparture} min)`;
+                }
+                
                 var popupContent = `
                     <b>Gbr: ${garageNumber}</b><br>
                     <b>Linija: ${data.name || lineName}</b><br>
-                    <b>Smjer: ${smjer}</b><br>
+                    <b>Smjer (live): ${smjer}</b><br>
                     <b>Dolazak:</b> ${expectedTime} (plan: ${plannedTime})
+                    ${scheduleText}
                 `;
                 marker.bindPopup(popupContent).openPopup();
             })
             .catch(error => {
                 console.error("Greška:", error);
+                var currentTime = new Date();
+                var scheduleInfo = getScheduleForLine(lineName, currentTime);
+                var scheduleText = "";
+                if (scheduleInfo) {
+                    scheduleText = `<br><b>Prema voznom redu:</b> ${scheduleInfo.direction} → ${scheduleInfo.destination}<br><b>Polazak:</b> ${scheduleInfo.departureTime} (za ${scheduleInfo.minutesToDeparture} min)`;
+                }
                 marker.bindPopup(`
                     <b>Gbr: ${garageNumber}</b><br>
                     <b>Linija: ${lineName}</b><br>
-                    <b>Smjer: Nepoznat</b>
+                    <b>Smjer (live): Nepoznat</b>
+                    ${scheduleText}
                 `).openPopup();
             });
     }
@@ -271,7 +383,7 @@
                     markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
                 } else {
                     var marker = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
-                    marker.on('click', () => fetchBusDetails(bus.garageNumber, marker, bus.name));
+                    marker.on('click', () => fetchBusDetails(bus.garageNumber, marker, bus.name, bus.latitude, bus.longitude));
                     markers[bus.garageNumber] = marker;
                     
                     marker.bindPopup(`
@@ -290,7 +402,7 @@
             }
             
             var vehicleCount = Object.keys(markers).length;
-            document.getElementById('statsText').innerHTML = `Ažurirano: ${new Date().toLocaleTimeString('hr-HR')} | ${vehicleCount} vozila`;
+            document.getElementById('statsText').innerHTML = `Ažurirano: ${new Date().toLocaleTimeString('hr-HR')} | ${vehicleCount} vozila | Vozni red: ${Object.keys(timetables).length} linija`;
             document.getElementById('busCount').innerHTML = `${vehicleCount} vozila`;
         } catch (error) {
             console.error("Greška:", error);
@@ -298,6 +410,9 @@
         }
     }
     
+    // ============================================================
+    // 7. PRETRAGA (autobusi + stanice)
+    // ============================================================
     function showSuggestions() {
         var val = document.getElementById('busSearch').value.toLowerCase().trim();
         var div = document.getElementById('suggestionsList');
@@ -380,6 +495,9 @@
         document.getElementById('busCount').innerHTML = `${brojac} / ${Object.keys(markers).length} vozila`;
     }
     
+    // ============================================================
+    // 8. POKRETANJE
+    // ============================================================
     document.addEventListener('click', e => {
         var c = document.querySelector('.autocomplete-container');
         if (c && !c.contains(e.target)) {
