@@ -2,29 +2,28 @@
 <html lang="hr">
 <head>
     <meta charset="UTF-8">
-    <title>Promet Split Live</title>
+    <title>Split Transit Tracker</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body { margin: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
-        #header { background: #0055a4; padding: 10px; z-index: 1000; }
-        #search { width: 100%; max-width: 400px; padding: 8px; border-radius: 20px; border: none; display: block; margin: 0 auto; }
+        #header { background: #0055a4; padding: 12px; z-index: 1000; text-align: center; }
+        #search { width: 100%; max-width: 400px; padding: 10px; border-radius: 20px; border: none; outline: none; }
         #map { flex-grow: 1; }
-        #list { height: 35%; overflow-y: auto; background: white; border-top: 2px solid #222; }
+        #panel { height: 35%; overflow-y: auto; background: white; border-top: 2px solid #333; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
-        .gbr { background: #222; color: #ffc107; padding: 2px 5px; border-radius: 3px; font-weight: bold; }
-        .bus-icon { width: 40px!important; height: 40px!important; border-radius: 50%; border: 2px solid #333; display: flex; flex-direction: column; overflow: hidden; }
-        .i-top { background: white; height: 50%; display: flex; align-items: center; justify-content: center; color: #ff6f00; font-weight: bold; }
-        .i-bot { background: #ffeb3b; height: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+        th { background: #f8f9fa; position: sticky; top: 0; }
+        .gbr-label { background: #222; color: #ffc107; padding: 3px 7px; border-radius: 4px; font-weight: bold; font-family: monospace; }
+        .bus-icon { width: 40px!important; height: 40px!important; border-radius: 50%; border: 2px solid #333; background: #ffeb3b; display: flex; align-items: center; justify-content: center; font-weight: bold; color: black; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
 
-<div id="header"><input type="text" id="search" placeholder="Pretraži..." onkeyup="filter()"></div>
+<div id="header"><input type="text" id="search" placeholder="Pretraži vozilo ili liniju..." onkeyup="filter()"></div>
 <div id="map"></div>
-<div id="list">
+<div id="panel">
     <table>
-        <thead><tr><th>GBR</th><th>Linija</th><th>Odredište</th></tr></thead>
+        <thead><tr><th>GBR</th><th>Model</th><th>Linija</th><th>Odredište</th></tr></thead>
         <tbody id="busBody"></tbody>
     </table>
 </div>
@@ -39,6 +38,7 @@
         fetch('/api/vehicles').then(r => r.json()).then(data => {
             if (!Array.isArray(data)) return;
             let html = "";
+
             data.forEach(bus => {
                 let id = bus.deviceId || bus.id;
                 let gbr = bus.vehicleNumber || bus.label || "???";
@@ -46,24 +46,38 @@
                 let lat = bus.latitude, lon = bus.longitude;
 
                 if (lat && lon) {
-                    let iconHtml = `<div class="bus-icon"><div class="i-top">${line}</div><div class="i-bot">${gbr}</div></div>`;
-                    let icon = L.divIcon({ html: iconHtml, iconSize: [40, 40], iconAnchor: [20, 20], className: '' });
+                    // Marker s brojem linije
+                    let icon = L.divIcon({ 
+                        html: `<div class="bus-icon">${line}</div>`, 
+                        className: '', 
+                        iconSize: [40, 40], 
+                        iconAnchor: [20, 20] 
+                    });
 
                     if (markers[id]) {
                         markers[id].setLatLng([lat, lon]).setIcon(icon);
                     } else {
-                        markers[id] = L.marker([lat, lon], {icon: icon}).addTo(map);
+                        markers[id] = L.marker([lat, lon], {icon: icon}).addTo(map)
+                            .bindPopup(`<b>GBR: ${gbr}</b><br>Linija: ${line}<br>${bus.destination || ''}`);
                     }
-                    html += `<tr onclick="map.setView([${lat}, ${lon}], 16)"><td><span class="gbr">${gbr}</span></td><td>${line}</td><td>${bus.destination || ''}</td></tr>`;
+
+                    html += `<tr onclick="map.setView([${lat}, ${lon}], 17)">
+                        <td><span class="gbr-label">${gbr}</span></td>
+                        <td>${bus.model || 'Autobus'}</td>
+                        <td><b>${line}</b></td>
+                        <td>${bus.destination || 'U prometu'}</td>
+                    </tr>`;
                 }
             });
             document.getElementById("busBody").innerHTML = html;
-        });
+        }).catch(err => console.error("API Error"));
     }
 
     function filter() {
         let v = document.getElementById("search").value.toLowerCase();
-        document.querySelectorAll("#busBody tr").forEach(r => r.style.display = r.innerText.toLowerCase().includes(v) ? "" : "none");
+        document.querySelectorAll("#busBody tr").forEach(r => {
+            r.style.display = r.innerText.toLowerCase().includes(v) ? "" : "none";
+        });
     }
 
     setInterval(update, 10000);
