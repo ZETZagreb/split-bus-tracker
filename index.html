@@ -16,7 +16,7 @@
         body { margin: 0; padding: 0; background: #111; }
         #map { height: 100vh; width: 100%; }
         
-        /* Gumb za prikaz stanica - uvijek vidljiv, odvojen od tražilice */
+        /* Gumb za prikaz stanica - dolje centrirano, ne preklapa se s tražilicom */
         .control-panel {
             position: absolute;
             bottom: 24px;
@@ -27,7 +27,6 @@
             border-radius: 60px;
             box-shadow: 0 6px 20px rgba(0,0,0,0.3);
             overflow: hidden;
-            backdrop-filter: blur(4px);
         }
         
         .control-panel button {
@@ -45,21 +44,17 @@
             letter-spacing: 0.3px;
         }
         
-        .control-panel button i {
-            font-size: 16px;
-        }
-        
         .control-panel button:active {
             background: #ff5500;
             transform: scale(0.97);
         }
         
-        /* PRETRAGA - gore lijevo, ne smeta gumbu */
+        /* PRETRAGA - gore desno, kompaktna, ne smeta gumbu */
         .search-container {
             position: absolute; 
             top: 16px; 
-            left: 16px;
             right: 16px;
+            left: auto;
             z-index: 1000; 
             background: white;
             border-radius: 60px;
@@ -70,7 +65,9 @@
             backdrop-filter: blur(10px);
             background: rgba(255,255,255,0.98);
             border: 1px solid rgba(0,0,0,0.08);
-            max-width: calc(100% - 32px);
+            width: auto;
+            min-width: 180px;
+            max-width: 280px;
         }
         
         .autocomplete-container {
@@ -79,17 +76,17 @@
         }
         
         .search-icon {
-            padding: 12px 0 12px 18px;
+            padding: 10px 0 10px 16px;
             color: #ff6600;
-            font-size: 16px;
+            font-size: 14px;
         }
         
         input { 
-            padding: 14px 12px 14px 0;
+            padding: 12px 12px 12px 0;
             width: 100%;
             border: none;
             border-radius: 0;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 500;
             background: transparent;
             outline: none;
@@ -99,14 +96,15 @@
         input::placeholder {
             color: #999;
             font-weight: 400;
+            font-size: 13px;
         }
         
         .bus-count-badge {
             background: #ff6600;
             color: white;
-            padding: 8px 16px;
+            padding: 6px 14px;
             border-radius: 60px;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 700;
             margin-right: 6px;
             white-space: nowrap;
@@ -116,17 +114,18 @@
         }
         
         .bus-count-badge i {
-            font-size: 13px;
+            font-size: 12px;
         }
         
         .autocomplete-list {
             position: absolute;
             top: calc(100% + 10px);
-            left: 0;
             right: 0;
+            left: auto;
+            min-width: 260px;
             background: white;
             border-radius: 24px;
-            max-height: 320px;
+            max-height: 350px;
             overflow-y: auto;
             z-index: 1001;
             box-shadow: 0 12px 30px rgba(0,0,0,0.25);
@@ -154,7 +153,7 @@
             background: #fff0e6;
             padding: 6px 12px;
             border-radius: 40px;
-            font-size: 14px;
+            font-size: 13px;
             display: inline-flex;
             align-items: center;
             gap: 8px;
@@ -162,11 +161,11 @@
         
         .autocomplete-line {
             color: #666;
-            font-size: 13px;
+            font-size: 12px;
             margin-left: 8px;
         }
         
-        /* Stats donji desni - mali */
+        /* Stats donji desni */
         .stats {
             position: absolute;
             bottom: 20px;
@@ -175,7 +174,7 @@
             background: rgba(0,0,0,0.75);
             backdrop-filter: blur(8px);
             color: white;
-            padding: 8px 14px;
+            padding: 6px 12px;
             border-radius: 40px;
             font-size: 11px;
             font-weight: 500;
@@ -191,7 +190,7 @@
             opacity: 0.8;
         }
         
-        /* IKONE AUTOBUSA - optimalne za mobitel i desktop */
+        /* IKONE AUTOBUSA */
         .bus-label {
             width: 56px;
             height: 42px;
@@ -266,7 +265,6 @@
             text-align: center;
         }
         
-        /* Scrollbar */
         .autocomplete-list::-webkit-scrollbar {
             width: 5px;
         }
@@ -281,12 +279,10 @@
             border-radius: 10px;
         }
         
-        /* MOBITEL OPTIMIZACIJA */
+        /* MOBITEL */
         @media (max-width: 768px) {
             .control-panel {
                 bottom: 20px;
-                left: 50%;
-                transform: translateX(-50%);
             }
             
             .control-panel button {
@@ -294,39 +290,45 @@
                 font-size: 14px;
             }
             
-            .control-panel button i {
-                font-size: 14px;
-            }
-            
             .search-container {
                 top: 12px;
-                left: 12px;
                 right: 12px;
-                max-width: calc(100% - 24px);
+                min-width: 160px;
+                max-width: 220px;
             }
             
             .search-icon {
-                padding: 10px 0 10px 14px;
-                font-size: 14px;
+                padding: 8px 0 8px 14px;
+                font-size: 13px;
             }
             
             input {
-                padding: 12px 10px 12px 0;
-                font-size: 14px;
+                padding: 10px 10px 10px 0;
+                font-size: 13px;
+            }
+            
+            input::placeholder {
+                font-size: 12px;
             }
             
             .bus-count-badge {
-                padding: 6px 12px;
-                font-size: 12px;
+                padding: 5px 10px;
+                font-size: 11px;
                 margin-right: 4px;
             }
             
             .bus-count-badge i {
-                font-size: 11px;
+                font-size: 10px;
             }
             
             .bus-count-badge span {
-                font-size: 12px;
+                font-size: 11px;
+            }
+            
+            .autocomplete-list {
+                min-width: 220px;
+                right: 0;
+                left: auto;
             }
             
             .autocomplete-item {
@@ -353,19 +355,19 @@
             .stats {
                 bottom: 12px;
                 right: 12px;
-                padding: 6px 10px;
+                padding: 5px 10px;
                 font-size: 10px;
             }
         }
         
         @media (max-width: 480px) {
-            .control-panel button {
-                padding: 9px 20px;
-                font-size: 13px;
+            .search-container {
+                min-width: 140px;
+                max-width: 190px;
             }
             
             .bus-count-badge span {
-                font-size: 11px;
+                font-size: 10px;
             }
             
             .bus-label, .bus-label-red {
@@ -399,7 +401,7 @@
         <i class="fas fa-search"></i>
     </div>
     <div class="autocomplete-container">
-        <input type="text" id="busSearch" placeholder="Garažni broj ili linija..." autocomplete="off">
+        <input type="text" id="busSearch" placeholder="Gbr ili linija..." autocomplete="off">
         <div id="suggestionsList" class="autocomplete-list" style="display: none;"></div>
     </div>
     <div class="bus-count-badge">
@@ -425,13 +427,11 @@
     var stopMarkers = [];
     var stopsVisible = false;
     
-    // Funkcija za kreiranje ikone - CRVENA za garažne 307 i 308
     function createBusIcon(lineName, garageNumber) {
         var specialGarageNumbers = ['307', '308', 307, 308];
         var isSpecial = specialGarageNumbers.includes(String(garageNumber).trim());
         
         var html = '';
-        
         if (isSpecial) {
             html = `<div class="bus-label-red">
                         <div class="bus-top">${lineName}</div>
@@ -584,12 +584,16 @@
         var val = document.getElementById('busSearch').value.toLowerCase();
         var brojac = 0;
         for (var gbr in markers) {
-            var popup = markers[gbr].getPopup().getContent();
-            if (typeof popup === 'string' && popup.toLowerCase().includes(val)) {
-                markers[gbr].setOpacity(1);
+            var marker = markers[gbr];
+            var busData = marker.busData || {};
+            var lineName = busData.name || '';
+            var gbrNum = String(gbr);
+            
+            if (lineName.toLowerCase().includes(val) || gbrNum.includes(val)) {
+                marker.setOpacity(1);
                 brojac++;
             } else {
-                markers[gbr].setOpacity(0.25);
+                marker.setOpacity(0.25);
             }
         }
         document.getElementById('busCount').innerHTML = `${brojac}`;
@@ -598,18 +602,28 @@
     function showSuggestions() {
         var val = document.getElementById('busSearch').value.toLowerCase().trim();
         var div = document.getElementById('suggestionsList');
-        if (val.length < 1) { div.style.display = 'none'; return; }
+        if (val.length < 1) { 
+            div.style.display = 'none'; 
+            return; 
+        }
         
         var suggestions = [];
         for (var gbr in markers) {
-            var popup = markers[gbr].getPopup().getContent();
-            var gbrMatch = popup.match(/Garažni broj: (\d+)/);
-            var lineMatch = popup.match(/Linija (\d+[A-Z]?)/);
-            if (gbrMatch && (gbrMatch[1].includes(val) || (lineMatch && lineMatch[1].includes(val)))) {
-                suggestions.push({ gbr: gbrMatch[1], line: lineMatch ? lineMatch[1] : '', marker: markers[gbr] });
+            var marker = markers[gbr];
+            var busData = marker.busData || {};
+            var lineName = busData.name || '';
+            var gbrNum = String(gbr);
+            
+            if (lineName.toLowerCase().includes(val) || gbrNum.includes(val)) {
+                suggestions.push({ 
+                    gbr: gbrNum, 
+                    line: lineName, 
+                    marker: marker 
+                });
             }
         }
         
+        // Dodaj stanice samo ako su vidljive
         if (allStops.length > 0 && stopsVisible) {
             allStops.forEach(stop => {
                 if (stop.name.toLowerCase().includes(val)) {
@@ -618,13 +632,18 @@
             });
         }
         
+        // Ukloni duplikate po gbr
         var unique = [];
-        var seen = {};
+        var seenGbr = {};
         for (var i = 0; i < suggestions.length; i++) {
-            var key = suggestions[i].gbr || suggestions[i].name;
-            if (!seen[key]) {
-                seen[key] = true;
-                unique.push(suggestions[i]);
+            var item = suggestions[i];
+            if (item.gbr) {
+                if (!seenGbr[item.gbr]) {
+                    seenGbr[item.gbr] = true;
+                    unique.push(item);
+                }
+            } else {
+                unique.push(item);
             }
         }
         
@@ -635,24 +654,26 @@
                 d.className = 'autocomplete-item';
                 if (item.gbr) {
                     d.innerHTML = `<span class="autocomplete-gbr"><i class="fas fa-bus"></i> ${item.gbr}</span><span class="autocomplete-line">Linija ${item.line}</span>`;
-                    d.onclick = () => {
-                        document.getElementById('busSearch').value = item.gbr;
-                        div.style.display = 'none';
-                        if (item.marker) {
-                            map.setView(item.marker.getLatLng(), 16);
-                            item.marker.openPopup();
+                    d.onclick = (function(marker, gbrVal) {
+                        return function() {
+                            document.getElementById('busSearch').value = gbrVal;
+                            div.style.display = 'none';
+                            map.setView(marker.getLatLng(), 16);
+                            marker.openPopup();
                             filterBuses();
-                        }
-                    };
+                        };
+                    })(item.marker, item.gbr);
                 } else {
                     d.innerHTML = `<span class="autocomplete-gbr"><i class="fas fa-map-pin"></i> ${item.name}</span>`;
-                    d.onclick = () => {
-                        document.getElementById('busSearch').value = item.name;
-                        div.style.display = 'none';
-                        var lat = item.stop.geography.coordinates[1];
-                        var lng = item.stop.geography.coordinates[0];
-                        map.setView([lat, lng], 16);
-                    };
+                    d.onclick = (function(stopData) {
+                        return function() {
+                            document.getElementById('busSearch').value = stopData.name;
+                            div.style.display = 'none';
+                            var lat = stopData.geography.coordinates[1];
+                            var lng = stopData.geography.coordinates[0];
+                            map.setView([lat, lng], 16);
+                        };
+                    })(item.stop);
                 }
                 div.appendChild(d);
             });
@@ -662,9 +683,31 @@
         }
     }
     
+    // Spremi busData na markere nakon što se kreiraju
+    function updateBusData() {
+        for (var gbr in markers) {
+            var marker = markers[gbr];
+            var popupContent = marker.getPopup().getContent();
+            if (typeof popupContent === 'string') {
+                var lineMatch = popupContent.match(/Linija (\d+[A-Z]?)/);
+                if (lineMatch && !marker.busData) {
+                    marker.busData = { name: lineMatch[1] };
+                }
+            }
+        }
+    }
+    
+    // Override fetchLiveBuses da doda busData
+    var originalFetchLiveBuses = fetchLiveBuses;
+    window.fetchLiveBuses = async function() {
+        await originalFetchLiveBuses();
+        updateBusData();
+    };
+    fetchLiveBuses = window.fetchLiveBuses;
+    
     document.getElementById('toggleStopsBtn').onclick = toggleStops;
     document.getElementById('busSearch').addEventListener('keyup', showSuggestions);
-    document.addEventListener('click', e => {
+    document.addEventListener('click', function(e) {
         var c = document.querySelector('.autocomplete-container');
         if (c && !c.contains(e.target)) {
             document.getElementById('suggestionsList').style.display = 'none';
@@ -673,7 +716,9 @@
     
     loadStops();
     fetchLiveBuses();
-    setInterval(fetchLiveBuses, 5000);
+    setInterval(function() {
+        fetchLiveBuses();
+    }, 5000);
 </script>
 </body>
 </html>
