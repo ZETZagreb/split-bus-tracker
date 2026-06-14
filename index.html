@@ -110,65 +110,66 @@
             font-size: 12px;
         }
         
-        /* SMANJENE ikone autobusa */
+        /* SMANJENE ikone autobusa - sve veličine smanjene za 25% */
         .bus-label {
-            width: 40px;
-            height: 32px;
-            border: 2px solid #333;
-            border-radius: 5px;
+            width: 30px;
+            height: 24px;
+            border: 1.5px solid #333;
+            border-radius: 4px;
             overflow: hidden;
             font-family: 'Arial Black', sans-serif;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
             display: flex;
             flex-direction: column;
             cursor: pointer;
-            font-size: 10px;
+            font-size: 8px;
         }
         
         .bus-label-red {
-            width: 40px;
-            height: 32px;
-            border: 2px solid #ff0000;
-            border-radius: 5px;
+            width: 30px;
+            height: 24px;
+            border: 1.5px solid #ff0000;
+            border-radius: 4px;
             overflow: hidden;
             font-family: 'Arial Black', sans-serif;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.4);
             display: flex;
             flex-direction: column;
             cursor: pointer;
-            font-size: 10px;
+            font-size: 8px;
+            background-color: #ff0000;
         }
         
         .bus-top {
             background: white;
             color: #ff6600;
-            height: 16px;
-            line-height: 16px;
+            height: 12px;
+            line-height: 12px;
             font-weight: bold;
-            font-size: 10px;
+            font-size: 8px;
             text-align: center;
         }
         
         .bus-bottom {
             background: #ffcc00;
             color: white;
-            height: 16px;
-            line-height: 16px;
+            height: 12px;
+            line-height: 12px;
             font-weight: bold;
-            font-size: 10px;
+            font-size: 8px;
             text-align: center;
-            text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+            text-shadow: 0.5px 0.5px 0.5px rgba(0,0,0,0.2);
         }
         
         .bus-bottom-red {
-            background: #ff0000;
+            background: #cc0000;
             color: white;
-            height: 16px;
-            line-height: 16px;
+            height: 12px;
+            line-height: 12px;
             font-weight: bold;
-            font-size: 10px;
+            font-size: 8px;
             text-align: center;
-            text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+            text-shadow: 0.5px 0.5px 0.5px rgba(0,0,0,0.2);
         }
     </style>
 </head>
@@ -200,19 +201,17 @@
     var stopMarkers = [];
     var stopsVisible = false;
     
-    // Provjera je li linija 307 ili 308
-    function isSpecialLine(lineName) {
-        return lineName === '307' || lineName === '308';
-    }
-    
-    // Stvaranje ikone za autobus (normalna ili crvena)
+    // Funkcija za kreiranje ikone - crvena za garažne 307 i 308
     function createBusIcon(lineName, garageNumber) {
-        var isSpecial = isSpecialLine(lineName);
+        // Garažni brojevi koji trebaju biti crveni
+        var specialGarageNumbers = ['307', '308', 307, 308];
+        var isSpecial = specialGarageNumbers.includes(String(garageNumber).trim());
+        
         var html = '';
         
         if (isSpecial) {
             html = `<div class="bus-label-red">
-                        <div class="bus-top">${lineName}</div>
+                        <div class="bus-top" style="color:white;">${lineName}</div>
                         <div class="bus-bottom-red">${garageNumber}</div>
                     </div>`;
         } else {
@@ -225,8 +224,8 @@
         return L.divIcon({ 
             html: html,
             className: '', 
-            iconSize: [40, 32], 
-            iconAnchor: [20, 16]
+            iconSize: [30, 24], 
+            iconAnchor: [15, 12]
         });
     }
     
@@ -251,7 +250,7 @@
             var routes = stop.routes ? stop.routes.map(r => r.name).join(', ') : '';
             
             var marker = L.circleMarker([lat, lng], {
-                radius: 5,
+                radius: 4,
                 fillColor: "#3388ff",
                 color: "#fff",
                 weight: 1,
