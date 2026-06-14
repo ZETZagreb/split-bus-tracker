@@ -143,6 +143,30 @@
             text-align: center;
             text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
         }
+        
+        /* Popup stil */
+        .custom-popup {
+            max-height: 350px;
+            overflow-y: auto;
+            font-size: 12px;
+            min-width: 250px;
+        }
+        .custom-popup h4 {
+            margin: 0 0 5px 0;
+            color: #ff6600;
+        }
+        .custom-popup .station-list {
+            margin-top: 8px;
+        }
+        .custom-popup .station-item {
+            padding: 3px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .custom-popup .station-time {
+            float: right;
+            font-weight: bold;
+            color: #ff6600;
+        }
     </style>
 </head>
 <body>
@@ -151,7 +175,7 @@
 </div>
 <div class="search-container">
     <div class="autocomplete-container">
-        <input type="text" id="busSearch" placeholder="Gbr ili Linija..." onkeyup="showSuggestions()" autocomplete="off">
+        <input type="text" id="busSearch" placeholder="Gbr ili Linija..." autocomplete="off">
         <div id="suggestionsList" class="autocomplete-list" style="display: none;"></div>
     </div>
     <span id="busCount" style="font-size:12px; color:#333; line-height:28px;"></span>
@@ -163,9 +187,10 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // Čekamo da se stranica učitala prije nego što pokrenemo kartu
+    // Čekamo da se stranica učita
     document.addEventListener('DOMContentLoaded', function() {
         
+        // MAPA
         var map = L.map('map').setView([43.51, 16.44], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
@@ -173,23 +198,28 @@
         
         // PODACI
         var markers = {};
-        var allStops = [];
+        var allStops = [];           // sve stanice iz stops.json
+        var stopsById = {};          // mapa: id -> stanica (za brzi pristup)
         var stopMarkers = [];
         var stopsVisible = false;
         var currentRouteLine = null;
         
-        // Učitaj stanice
+        // Učitaj stanice iz stops.json
         function loadStops() {
             fetch('stops.json')
                 .then(response => response.json())
                 .then(stops => {
                     allStops = stops;
+                    // Napravi mapu ID -> stanica
+                    stops.forEach(stop => {
+                        stopsById[stop.id] = stop;
+                    });
                     console.log('Učitano stanica:', stops.length);
                 })
-                .catch(err => console.error('Greška:', err));
+                .catch(err => console.error('Greška pri učitavanju stanica:', err));
         }
         
-        // Dodaj stanice na kartu
+        // Dodaj stanice na kartu (samo ako se klikne gumb)
         function addStopsToMap() {
             if (stopMarkers.length > 0) return;
             
@@ -227,66 +257,150 @@
             }
         }
         
-        // Iscrtaj rutu
-        function drawRoute(routeCoordinates) {
-            if (currentRouteLine) map.removeLayer(currentRouteLine);
-            if (routeCoordinates && routeCoordinates.length > 0) {
-                currentRouteLine = L.polyline(routeCoordinates, {
+        // Iscrtaj rutu iz pathwaySegments koordinata
+        function drawRouteFromSegments(segments) {
+            if (currentRouteLine) {
+                map.removeLayer(currentRouteLine);
+            }
+            
+            var allCoordinates = [];
+            segments.forEach(segment => {
+                if (segment.geography && segment.geography.coordinates) {
+                    // Koordinate su [lon, lat] -> treba [lat, lon] za Leaflet
+                    var coords = segment.geography.coordinates.map(coord => [coord[1], coord[0]]);
+                    allCoordinates.push(...coords);
+                }
+            });
+            
+            if (allCoordinates.length > 0) {
+                currentRouteLine = L.polyline(allCoordinates, {
                     color: '#ff6600',
-                    weight: 4,
-                    opacity: 0.7
+                    weight: 5,
+                    opacity: 0.8
                 }).addTo(map);
+                
+                // Zumiraj na rutu
+                map.fitBounds(currentRouteLine.getBounds());
             }
         }
         
-        // Klik na autobus - prikaži stanice i rutu
-        function onBusClick(bus, marker) {
-            // Demo podaci za liniju (kasnije ćemo zamijeniti s pravim API-jem)
-            var demoStops = [];
-            
-            // Prema broju linije, prikaži različite rute
-            if (bus.name === '37') {
-                demoStops = [
-                    { name: "TROGIR", arrivalTime: "19:14", lat: 43.518, lng: 16.251 },
-                    { name: "KAŠTEL STARI", arrivalTime: "19:28", lat: 43.552, lng: 16.342 },
-                    { name: "KAŠTEL NOVI", arrivalTime: "19:35", lat: 43.551, lng: 16.338 },
-                    { name: "SOLIN", arrivalTime: "19:50", lat: 43.538, lng: 16.490 },
-                    { name: "SPLIT - TERMINAL", arrivalTime: "20:05", lat: 43.515, lng: 16.443 }
-                ];
-            } else if (bus.name === '60') {
-                demoStops = [
-                    { name: "RAVNIČKI MOST", arrivalTime: "19:18", lat: 43.425, lng: 16.711 },
-                    { name: "OMIŠ", arrivalTime: "19:35", lat: 43.440, lng: 16.688 },
-                    { name: "DUGI RAT", arrivalTime: "19:50", lat: 43.444, lng: 16.640 },
-                    { name: "STOBREČ", arrivalTime: "20:10", lat: 43.503, lng: 16.522 },
-                    { name: "SPLIT - TERMINAL", arrivalTime: "20:25", lat: 43.515, lng: 16.443 }
-                ];
-            } else {
-                demoStops = [
-                    { name: "POLAZNA STANICA", arrivalTime: "19:00", lat: 43.510, lng: 16.440 },
-                    { name: "ZAVRŠNA STANICA", arrivalTime: "19:30", lat: 43.520, lng: 16.450 }
-                ];
+        // Dohvati detalje vožnje (trip) preko tripId-a
+        async function fetchTripDetails(tripId) {
+            try {
+                var response = await fetch(`https://www.bus-split.com/api/trips/details?id=${tripId}&t=${Date.now()}`);
+                var data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Greška pri dohvatu trip detalja:', error);
+                return null;
             }
+        }
+        
+        // Dohvati popis polazaka (trips) za određenu liniju
+        async function fetchTripsForLine(lineNumber) {
+            try {
+                var response = await fetch(`https://www.bus-split.com/api/trips?count=20&t=${Date.now()}`);
+                var trips = await response.json();
+                // Filtriraj po liniji
+                return trips.filter(trip => trip.name == lineNumber);
+            } catch (error) {
+                console.error('Greška pri dohvatu trips:', error);
+                return [];
+            }
+        }
+        
+        // Pronađi najbliži trip za autobus (prema vremenu)
+        function findClosestTrip(trips, currentTime) {
+            if (!trips || trips.length === 0) return null;
             
-            // Iscrtaj rutu
-            var routeCoords = demoStops.map(s => [s.lat, s.lng]);
-            drawRoute(routeCoords);
-            
-            // Napravi popup sa stanicama
-            var html = '<div style="max-height: 300px; overflow-y: auto; font-size: 12px; min-width: 200px;">';
-            html += `<b>🚌 Linija ${bus.name}</b><br>`;
-            if (bus.name === '37') html += `<b>Smjer:</b> TROGIR → SPLIT<br>`;
-            else if (bus.name === '60') html += `<b>Smjer:</b> RAVNIČKI MOST → OMIŠ → SPLIT<br>`;
-            else html += `<b>Smjer:</b> ${bus.name} linija<br>`;
-            html += `<b>Polazak s prve stanice:</b> ${demoStops[0].arrivalTime}<br><br>`;
-            html += '<b>📍 Stanice i vremena:</b><br>';
-            
-            demoStops.forEach((stop, index) => {
-                html += `${index + 1}. ${stop.name} - <b>${stop.arrivalTime}</b><br>`;
+            // Sortiraj po plannedArrivalTime (ili expectedArrivalTime)
+            var sorted = [...trips];
+            sorted.sort((a, b) => {
+                var timeA = new Date(a.plannedArrivalTime || a.expectedArrivalTime);
+                var timeB = new Date(b.plannedArrivalTime || b.expectedArrivalTime);
+                return timeA - timeB;
             });
             
-            html += '</div>';
-            marker.bindPopup(html).openPopup();
+            // Nađi prvi koji nije prošao
+            for (var i = 0; i < sorted.length; i++) {
+                var tripTime = new Date(sorted[i].plannedArrivalTime || sorted[i].expectedArrivalTime);
+                if (tripTime > currentTime) {
+                    return sorted[i];
+                }
+            }
+            return sorted[0]; // ako su svi prošli, uzmi zadnji
+        }
+        
+        // Klik na autobus - prikaži raspored
+        async function onBusClick(bus, marker) {
+            // Prvo pokaži "Učitavam..."
+            marker.bindPopup('<i>Učitavam raspored...</i>').openPopup();
+            
+            try {
+                // Dohvati sve trips za ovu liniju
+                var trips = await fetchTripsForLine(bus.name);
+                
+                if (trips.length === 0) {
+                    marker.bindPopup(`<b>Linija ${bus.name}</b><br><i>Nema dostupnih podataka o vožnji</i>`).openPopup();
+                    return;
+                }
+                
+                // Pronađi najbliži trip
+                var now = new Date();
+                var closestTrip = findClosestTrip(trips, now);
+                
+                if (!closestTrip || !closestTrip.tripId) {
+                    marker.bindPopup(`<b>Linija ${bus.name}</b><br><i>Nema dostupne vožnje</i>`).openPopup();
+                    return;
+                }
+                
+                // Dohvati detalje trip-a (stanice i ruta)
+                var tripDetails = await fetchTripDetails(closestTrip.tripId);
+                
+                if (!tripDetails) {
+                    marker.bindPopup(`<b>Linija ${bus.name}</b><br><i>Greška pri dohvatu detalja</i>`).openPopup();
+                    return;
+                }
+                
+                // Iscrtaj rutu iz pathwaySegments
+                if (tripDetails.pathwaySegments && tripDetails.pathwaySegments.length > 0) {
+                    drawRouteFromSegments(tripDetails.pathwaySegments);
+                }
+                
+                // Napravi popup sa stanicama
+                var html = `<div class="custom-popup">`;
+                html += `<h4>🚌 Linija ${bus.name}</h4>`;
+                html += `<b>Smjer:</b> ${closestTrip.pathwayName || 'Nepoznato'}<br>`;
+                html += `<b>Garažni broj:</b> ${bus.garageNumber}<br>`;
+                
+                // Vrijeme polaska s prve stanice
+                if (tripDetails.stations && tripDetails.stations.length > 0) {
+                    var firstStopId = tripDetails.stations[0].id;
+                    var firstStop = stopsById[firstStopId];
+                    var firstStopTime = tripDetails.stations[0].departureTime || tripDetails.stations[0].arrivalTime;
+                    html += `<b>Polazak:</b> ${firstStopTime} iz ${firstStop ? firstStop.name : 'polazne stanice'}<br><br>`;
+                }
+                
+                html += `<div class="station-list"><b>📍 Stanice i vremena:</b><br>`;
+                
+                if (tripDetails.stations && tripDetails.stations.length > 0) {
+                    tripDetails.stations.forEach((station, index) => {
+                        var stopInfo = stopsById[station.id];
+                        var stopName = stopInfo ? stopInfo.name : `Stanica ${station.id}`;
+                        var arrivalTime = station.arrivalTime || station.departureTime || '?';
+                        html += `<div class="station-item">${index + 1}. ${stopName} <span class="station-time">${arrivalTime}</span></div>`;
+                    });
+                } else {
+                    html += '<i>Nema podataka o stanicama</i>';
+                }
+                
+                html += `</div></div>`;
+                marker.bindPopup(html).openPopup();
+                
+            } catch (error) {
+                console.error('Greška:', error);
+                marker.bindPopup(`<b>Linija ${bus.name}</b><br><i>Greška pri učitavanju</i>`).openPopup();
+            }
         }
         
         // Dohvati live autobuse
@@ -309,7 +423,7 @@
                         var marker = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
                         marker.busData = { name: bus.name, garageNumber: bus.garageNumber };
                         marker.on('click', () => onBusClick(marker.busData, marker));
-                        marker.bindPopup(`<b>Linija: ${bus.name}</b><br><b>Garažni broj: ${bus.garageNumber}</b><br><i>Kliknite za raspored</i>`);
+                        marker.bindPopup(`<b>Linija: ${bus.name}</b><br><b>Garažni broj: ${bus.garageNumber}</b><br><i>Kliknite za raspored stanica</i>`);
                         markers[bus.garageNumber] = marker;
                     }
                 });
@@ -347,7 +461,7 @@
         }
         
         // Autocomplete
-        window.showSuggestions = function() {
+        function showSuggestions() {
             var val = document.getElementById('busSearch').value.toLowerCase().trim();
             var div = document.getElementById('suggestionsList');
             if (val.length < 2) { div.style.display = 'none'; return; }
@@ -379,11 +493,11 @@
             } else {
                 div.style.display = 'none';
             }
-        };
+        }
         
         // Eventi
         document.getElementById('toggleStopsBtn').onclick = toggleStops;
-        document.getElementById('busSearch').addEventListener('keyup', window.showSuggestions);
+        document.getElementById('busSearch').addEventListener('keyup', showSuggestions);
         document.addEventListener('click', e => {
             var c = document.querySelector('.autocomplete-container');
             if (c && !c.contains(e.target)) {
@@ -396,7 +510,7 @@
         fetchLiveBuses();
         setInterval(fetchLiveBuses, 5000);
         
-    }); // Kraj DOMContentLoaded
+    });
 </script>
 </body>
 </html>
