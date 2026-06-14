@@ -143,29 +143,6 @@
             text-align: center;
             text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
         }
-        
-        .custom-popup {
-            max-height: 350px;
-            overflow-y: auto;
-            font-size: 12px;
-            min-width: 250px;
-        }
-        .custom-popup h4 {
-            margin: 0 0 5px 0;
-            color: #ff6600;
-        }
-        .custom-popup .station-list {
-            margin-top: 8px;
-        }
-        .custom-popup .station-item {
-            padding: 3px 0;
-            border-bottom: 1px solid #eee;
-        }
-        .custom-popup .station-time {
-            float: right;
-            font-weight: bold;
-            color: #ff6600;
-        }
     </style>
 </head>
 <body>
@@ -186,305 +163,233 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        
-        var map = L.map('map').setView([43.51, 16.44], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-        }).addTo(map);
-        
-        var markers = {};
-        var allStops = [];
-        var stopsById = {};
-        var stopMarkers = [];
-        var stopsVisible = false;
-        var currentRouteLine = null;
-        var currentTripCache = {}; // cache za trip detalje
-        
-        function loadStops() {
-            fetch('stops.json')
-                .then(response => response.json())
-                .then(stops => {
-                    allStops = stops;
-                    stops.forEach(stop => { stopsById[stop.id] = stop; });
-                    console.log('Učitano stanica:', stops.length);
-                })
-                .catch(err => console.error('Greška:', err));
-        }
-        
-        function addStopsToMap() {
-            if (stopMarkers.length > 0) return;
-            allStops.forEach(stop => {
-                var lat = stop.geography.coordinates[1];
-                var lng = stop.geography.coordinates[0];
-                var routes = stop.routes ? stop.routes.map(r => r.name).join(', ') : '';
-                var marker = L.circleMarker([lat, lng], {
-                    radius: 5,
-                    fillColor: "#3388ff",
-                    color: "#fff",
-                    weight: 1,
-                    fillOpacity: 0.8
-                }).addTo(map);
-                marker.bindPopup(`<b>${stop.name}</b><br><b>Linije:</b> ${routes || 'Nema'}`);
-                stopMarkers.push(marker);
+    var map = L.map('map').setView([43.51, 16.44], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+    }).addTo(map);
+    
+    var markers = {};
+    var allStops = [];
+    var stopMarkers = [];
+    var stopsVisible = false;
+    
+    function loadStops() {
+        fetch('stops.json')
+            .then(response => response.json())
+            .then(stops => {
+                allStops = stops;
+                console.log(`Učitano ${stops.length} stanica`);
+            })
+            .catch(err => {
+                console.error('Greška pri učitavanju stanica:', err);
             });
-        }
+    }
+    
+    function addStopsToMap() {
+        if (stopMarkers.length > 0) return;
         
-        function removeStopsFromMap() {
-            stopMarkers.forEach(marker => map.removeLayer(marker));
-            stopMarkers = [];
+        allStops.forEach(stop => {
+            var lat = stop.geography.coordinates[1];
+            var lng = stop.geography.coordinates[0];
+            var routes = stop.routes ? stop.routes.map(r => r.name).join(', ') : '';
+            
+            var marker = L.circleMarker([lat, lng], {
+                radius: 5,
+                fillColor: "#3388ff",
+                color: "#fff",
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            }).addTo(map);
+            
+            marker.bindPopup(`<b>${stop.name}</b><br><b>Linije:</b> ${routes || 'Nema'}`);
+            stopMarkers.push(marker);
+        });
+    }
+    
+    function removeStopsFromMap() {
+        stopMarkers.forEach(marker => {
+            map.removeLayer(marker);
+        });
+        stopMarkers = [];
+    }
+    
+    function toggleStops() {
+        stopsVisible = !stopsVisible;
+        if (stopsVisible) {
+            addStopsToMap();
+            document.getElementById('toggleStopsBtn').innerHTML = '🔘 Sakrij stanice';
+        } else {
+            removeStopsFromMap();
+            document.getElementById('toggleStopsBtn').innerHTML = '🔘 Prikaži stanice';
         }
+    }
+    
+    function fetchBusDetails(garageNumber, marker, bus) {
+        var timestamp = Date.now();
+        var url = `https://www.bus-split.com/api/vehicles/details?id=${garageNumber}&t=${timestamp}`;
         
-        function toggleStops() {
-            stopsVisible = !stopsVisible;
-            if (stopsVisible) {
-                addStopsToMap();
-                document.getElementById('toggleStopsBtn').innerHTML = '🔘 Sakrij stanice';
-            } else {
-                removeStopsFromMap();
-                document.getElementById('toggleStopsBtn').innerHTML = '🔘 Prikaži stanice';
-            }
-        }
-        
-        function drawRouteFromSegments(segments) {
-            if (currentRouteLine) map.removeLayer(currentRouteLine);
-            var allCoordinates = [];
-            segments.forEach(segment => {
-                if (segment.geography && segment.geography.coordinates) {
-                    var coords = segment.geography.coordinates.map(coord => [coord[1], coord[0]]);
-                    allCoordinates.push(...coords);
-                }
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                var popupContent = `
+                    <b>Linija: ${data.name || bus.name}</b><br>
+                    <b>Garažni broj: ${garageNumber}</b><br>
+                    <b>Registarska oznaka: ${data.registrationNumber || bus.registrationNumber || 'Nepoznato'}</b><br>
+                    <b>Marka vozila: ${data.brand || bus.brand || 'Nepoznato'}</b>
+                `;
+                marker.bindPopup(popupContent).openPopup();
+            })
+            .catch(error => {
+                console.error("Greška:", error);
+                var popupContent = `
+                    <b>Linija: ${bus.name}</b><br>
+                    <b>Garažni broj: ${garageNumber}</b><br>
+                    <b>Registarska oznaka: ${bus.registrationNumber || 'Nepoznato'}</b><br>
+                    <b>Marka vozila: ${bus.brand || 'Nepoznato'}</b>
+                `;
+                marker.bindPopup(popupContent).openPopup();
             });
-            if (allCoordinates.length > 0) {
-                currentRouteLine = L.polyline(allCoordinates, { color: '#ff6600', weight: 5, opacity: 0.8 }).addTo(map);
-                map.fitBounds(currentRouteLine.getBounds());
-            }
-        }
-        
-        async function fetchTripDetails(tripId) {
-            if (currentTripCache[tripId]) return currentTripCache[tripId];
-            try {
-                var response = await fetch(`https://www.bus-split.com/api/trips/details?id=${tripId}&t=${Date.now()}`);
-                var data = await response.json();
-                currentTripCache[tripId] = data;
-                return data;
-            } catch (error) {
-                console.error('Greška:', error);
-                return null;
-            }
-        }
-        
-        async function fetchTrips() {
-            try {
-                var response = await fetch(`https://www.bus-split.com/api/trips?count=30&t=${Date.now()}`);
-                return await response.json();
-            } catch (error) {
-                console.error('Greška:', error);
-                return [];
-            }
-        }
-        
-        // Pronađi trip za autobus prema liniji i trenutnoj poziciji
-        async function findTripForBus(bus) {
-            var allTrips = await fetchTrips();
-            var lineTrips = allTrips.filter(trip => trip.name == bus.name);
-            if (lineTrips.length === 0) return null;
+    }
+    
+    async function fetchLiveBuses() {
+        try {
+            var response = await fetch(`https://www.bus-split.com/api/vehicles/live?t=${Date.now()}`);
+            var data = await response.json();
+            var vehicles = data.vehicles;
+            var currentGbrs = vehicles.map(v => v.garageNumber);
             
-            // Uzmi prvi trip koji nije prošao
-            var now = new Date();
-            for (var i = 0; i < lineTrips.length; i++) {
-                var tripTime = new Date(lineTrips[i].plannedArrivalTime || lineTrips[i].expectedArrivalTime);
-                if (tripTime > now) return lineTrips[i];
-            }
-            return lineTrips[0];
-        }
-        
-        // Pronađi sve stanice u trip-u (s vremenima)
-        async function getStopsForTrip(trip) {
-            if (!trip || !trip.tripId) return null;
-            var details = await fetchTripDetails(trip.tripId);
-            if (!details || !details.stations) return null;
-            
-            var stopsWithNames = [];
-            for (var i = 0; i < details.stations.length; i++) {
-                var station = details.stations[i];
-                var stopInfo = stopsById[station.id];
-                if (stopInfo) {
-                    stopsWithNames.push({
-                        name: stopInfo.name,
-                        arrivalTime: station.arrivalTime || station.departureTime,
-                        lat: stopInfo.geography.coordinates[1],
-                        lng: stopInfo.geography.coordinates[0],
-                        id: station.id
-                    });
-                }
-            }
-            return {
-                stops: stopsWithNames,
-                pathwaySegments: details.pathwaySegments,
-                pathwayName: trip.pathwayName
-            };
-        }
-        
-        async function onBusClick(bus, marker) {
-            marker.bindPopup('<i>Učitavam raspored...</i>').openPopup();
-            
-            try {
-                var trip = await findTripForBus(bus);
-                
-                if (trip && trip.tripId) {
-                    var tripData = await getStopsForTrip(trip);
-                    
-                    if (tripData && tripData.stops && tripData.stops.length > 0) {
-                        if (tripData.pathwaySegments && tripData.pathwaySegments.length > 0) {
-                            drawRouteFromSegments(tripData.pathwaySegments);
-                        }
-                        
-                        var html = `<div class="custom-popup">`;
-                        html += `<h4>🚌 Linija ${bus.name}</h4>`;
-                        html += `<b>Smjer:</b> ${tripData.pathwayName || trip.pathwayName || 'Nepoznato'}<br>`;
-                        html += `<b>Garažni broj:</b> ${bus.garageNumber}<br>`;
-                        
-                        if (tripData.stops.length > 0) {
-                            var firstStop = tripData.stops[0];
-                            html += `<b>Polazak:</b> ${firstStop.arrivalTime} iz ${firstStop.name}<br><br>`;
-                        }
-                        
-                        html += `<div class="station-list"><b>📍 Stanice i vremena (smjer ${tripData.pathwayName || ''}):</b><br>`;
-                        
-                        tripData.stops.forEach((stop, index) => {
-                            html += `<div class="station-item">${index + 1}. ${stop.name} <span class="station-time">${stop.arrivalTime || '?'}</span></div>`;
-                        });
-                        
-                        html += `</div></div>`;
-                        marker.bindPopup(html).openPopup();
-                        return;
-                    }
-                }
-                
-                // Ako nema trip-a, prikaži samo osnovne info bez stanica
-                var html = `<div class="custom-popup">`;
-                html += `<h4>🚌 Linija ${bus.name}</h4>`;
-                html += `<b>Garažni broj:</b> ${bus.garageNumber}<br>`;
-                html += `<i style="color:#ff6600;">ℹ️ Autobus je na cesti, ali trenutno nemamo podatke o njegovoj ruti i vremenima.</i><br>`;
-                html += `<i>Pokušajte kliknuti kasnije ili provjerite drugi autobus.</i>`;
-                html += `</div>`;
-                marker.bindPopup(html).openPopup();
-                
-            } catch (error) {
-                console.error('Greška:', error);
-                var html = `<div class="custom-popup">`;
-                html += `<h4>🚌 Linija ${bus.name}</h4>`;
-                html += `<b>Garažni broj:</b> ${bus.garageNumber}<br>`;
-                html += `<i>Greška pri učitavanju podataka</i>`;
-                html += `</div>`;
-                marker.bindPopup(html).openPopup();
-            }
-        }
-        
-        async function fetchLiveBuses() {
-            try {
-                var response = await fetch(`https://www.bus-split.com/api/vehicles/live?t=${Date.now()}`);
-                var data = await response.json();
-                var vehicles = data.vehicles;
-                var currentGbrs = vehicles.map(v => v.garageNumber);
-                
-                vehicles.forEach(bus => {
-                    var icon = L.divIcon({ 
-                        html: `<div class="bus-label"><div class="bus-top">${bus.name}</div><div class="bus-bottom">${bus.garageNumber}</div></div>`,
-                        className: '', iconSize: [55, 45], iconAnchor: [27, 22]
-                    });
-                    
-                    if (markers[bus.garageNumber]) {
-                        markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
-                    } else {
-                        var marker = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
-                        marker.busData = { name: bus.name, garageNumber: bus.garageNumber };
-                        marker.on('click', () => onBusClick(marker.busData, marker));
-                        marker.bindPopup(`<b>Linija: ${bus.name}</b><br><b>Garažni broj: ${bus.garageNumber}</b><br><i>Kliknite za raspored</i>`);
-                        markers[bus.garageNumber] = marker;
-                    }
+            vehicles.forEach(bus => {
+                var icon = L.divIcon({ 
+                    html: `<div class="bus-label"><div class="bus-top">${bus.name}</div><div class="bus-bottom">${bus.garageNumber}</div></div>`,
+                    className: '', iconSize: [55, 45], iconAnchor: [27, 22]
                 });
                 
-                for (var gbr in markers) { 
-                    if (!currentGbrs.includes(String(gbr))) { 
-                        map.removeLayer(markers[gbr]); 
-                        delete markers[gbr]; 
-                    } 
+                if (markers[bus.garageNumber]) {
+                    markers[bus.garageNumber].setLatLng([bus.latitude, bus.longitude]);
+                } else {
+                    var marker = L.marker([bus.latitude, bus.longitude], {icon: icon}).addTo(map);
+                    marker.on('click', () => fetchBusDetails(bus.garageNumber, marker, bus));
+                    markers[bus.garageNumber] = marker;
                 }
                 
-                var vehicleCount = Object.keys(markers).length;
-                document.getElementById('statsText').innerHTML = `Ažurirano: ${new Date().toLocaleTimeString('hr-HR')} | ${vehicleCount} vozila`;
-                document.getElementById('busCount').innerHTML = `${vehicleCount} vozila`;
-            } catch (error) {
-                console.error("Greška:", error);
-                document.getElementById('statsText').innerHTML = 'Greška pri učitavanju';
+                markers[bus.garageNumber].bindPopup(`
+                    <b>Linija: ${bus.name}</b><br>
+                    <b>Garažni broj: ${bus.garageNumber}</b><br>
+                    <i>Kliknite za više detalja...</i>
+                `);
+            });
+            
+            for (var gbr in markers) { 
+                if (!currentGbrs.includes(String(gbr))) { 
+                    map.removeLayer(markers[gbr]); 
+                    delete markers[gbr]; 
+                } 
+            }
+            
+            var vehicleCount = Object.keys(markers).length;
+            document.getElementById('statsText').innerHTML = `Ažurirano: ${new Date().toLocaleTimeString('hr-HR')} | ${vehicleCount} vozila`;
+            document.getElementById('busCount').innerHTML = `${vehicleCount} vozila`;
+        } catch (error) {
+            console.error("Greška:", error);
+            document.getElementById('statsText').innerHTML = 'Greška pri učitavanju';
+        }
+    }
+    
+    function filterBuses() {
+        var val = document.getElementById('busSearch').value.toLowerCase();
+        var brojac = 0;
+        for (var gbr in markers) {
+            var popup = markers[gbr].getPopup().getContent();
+            if (popup.toLowerCase().includes(val)) {
+                markers[gbr].setOpacity(1);
+                brojac++;
+            } else {
+                markers[gbr].setOpacity(0.2);
+            }
+        }
+        document.getElementById('busCount').innerHTML = `${brojac} / ${Object.keys(markers).length} vozila`;
+    }
+    
+    function showSuggestions() {
+        var val = document.getElementById('busSearch').value.toLowerCase().trim();
+        var div = document.getElementById('suggestionsList');
+        if (val.length < 2) { div.style.display = 'none'; return; }
+        
+        var suggestions = [];
+        for (var gbr in markers) {
+            var popup = markers[gbr].getPopup().getContent();
+            var gbrMatch = popup.match(/Garažni broj: (\d+)/);
+            var lineMatch = popup.match(/Linija: (\d+[A-Z]?)/);
+            if (gbrMatch && (gbrMatch[1].includes(val) || (lineMatch && lineMatch[1].includes(val)))) {
+                suggestions.push({ gbr: gbrMatch[1], line: lineMatch ? lineMatch[1] : '', marker: markers[gbr] });
             }
         }
         
-        function filterBuses() {
-            var val = document.getElementById('busSearch').value.toLowerCase();
-            var brojac = 0;
-            for (var gbr in markers) {
-                var busName = markers[gbr].busData?.name || '';
-                if (busName.toLowerCase().includes(val) || gbr.includes(val)) {
-                    markers[gbr].setOpacity(1);
-                    brojac++;
-                } else {
-                    markers[gbr].setOpacity(0.2);
+        if (allStops.length > 0 && stopsVisible) {
+            allStops.forEach(stop => {
+                if (stop.name.toLowerCase().includes(val)) {
+                    suggestions.push({ type: 'stop', name: stop.name, stop: stop });
                 }
-            }
-            document.getElementById('busCount').innerHTML = `${brojac} / ${Object.keys(markers).length} vozila`;
+            });
         }
         
-        function showSuggestions() {
-            var val = document.getElementById('busSearch').value.toLowerCase().trim();
-            var div = document.getElementById('suggestionsList');
-            if (val.length < 2) { div.style.display = 'none'; return; }
-            
-            var suggestions = [];
-            for (var gbr in markers) {
-                var busName = markers[gbr].busData?.name || '';
-                if (busName.includes(val) || gbr.includes(val)) {
-                    suggestions.push({ gbr: gbr, line: busName, marker: markers[gbr] });
-                }
+        var unique = [];
+        var seen = {};
+        for (var i = 0; i < suggestions.length; i++) {
+            var key = suggestions[i].gbr || suggestions[i].name;
+            if (!seen[key]) {
+                seen[key] = true;
+                unique.push(suggestions[i]);
             }
-            
-            if (suggestions.length > 0) {
-                div.innerHTML = '';
-                suggestions.slice(0, 10).forEach(item => {
-                    var d = document.createElement('div');
-                    d.className = 'autocomplete-item';
+        }
+        
+        if (unique.length > 0) {
+            div.innerHTML = '';
+            unique.slice(0, 10).forEach(item => {
+                var d = document.createElement('div');
+                d.className = 'autocomplete-item';
+                if (item.gbr) {
                     d.innerHTML = `<span class="autocomplete-gbr">🚌 ${item.gbr}</span><span class="autocomplete-line">Linija ${item.line}</span>`;
                     d.onclick = () => {
                         document.getElementById('busSearch').value = item.gbr;
                         div.style.display = 'none';
-                        map.setView(item.marker.getLatLng(), 15);
-                        item.marker.openPopup();
-                        filterBuses();
+                        if (item.marker) {
+                            map.setView(item.marker.getLatLng(), 15);
+                            item.marker.openPopup();
+                            filterBuses();
+                        }
                     };
-                    div.appendChild(d);
-                });
-                div.style.display = 'block';
-            } else {
-                div.style.display = 'none';
-            }
+                } else {
+                    d.innerHTML = `<span class="autocomplete-gbr">📍 ${item.name}</span>`;
+                    d.onclick = () => {
+                        document.getElementById('busSearch').value = item.name;
+                        div.style.display = 'none';
+                        var lat = item.stop.geography.coordinates[1];
+                        var lng = item.stop.geography.coordinates[0];
+                        map.setView([lat, lng], 15);
+                    };
+                }
+                div.appendChild(d);
+            });
+            div.style.display = 'block';
+        } else {
+            div.style.display = 'none';
         }
-        
-        document.getElementById('toggleStopsBtn').onclick = toggleStops;
-        document.getElementById('busSearch').addEventListener('keyup', showSuggestions);
-        document.addEventListener('click', e => {
-            var c = document.querySelector('.autocomplete-container');
-            if (c && !c.contains(e.target)) {
-                document.getElementById('suggestionsList').style.display = 'none';
-            }
-        });
-        
-        loadStops();
-        fetchLiveBuses();
-        setInterval(fetchLiveBuses, 5000);
-        
+    }
+    
+    document.getElementById('toggleStopsBtn').onclick = toggleStops;
+    document.getElementById('busSearch').addEventListener('keyup', showSuggestions);
+    document.addEventListener('click', e => {
+        var c = document.querySelector('.autocomplete-container');
+        if (c && !c.contains(e.target)) {
+            document.getElementById('suggestionsList').style.display = 'none';
+        }
     });
+    
+    loadStops();
+    fetchLiveBuses();
+    setInterval(fetchLiveBuses, 5000);
 </script>
 </body>
 </html>
