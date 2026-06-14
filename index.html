@@ -3,7 +3,7 @@
 <head>
     <title>Promet Split - Live Autobusi</title>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
@@ -13,48 +13,48 @@
             box-sizing: border-box;
         }
         
-        body { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; background: #111; }
         #map { height: 100vh; width: 100%; }
         
-        /* Gumb za prikaz stanica - veći za mobitel */
+        /* Gumb za prikaz stanica - uvijek vidljiv, odvojen od tražilice */
         .control-panel {
             position: absolute;
-            top: 16px;
-            right: 16px;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
             z-index: 1000;
-            background: white;
-            padding: 0;
-            border-radius: 48px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            display: flex;
-            flex-direction: column;
-            gap: 0;
+            background: #1a1a2e;
+            border-radius: 60px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
             overflow: hidden;
+            backdrop-filter: blur(4px);
         }
         
         .control-panel button {
-            padding: 12px 20px;
-            background: #1a1a2e;
+            padding: 12px 28px;
+            background: #ff6600;
             color: white;
             border: none;
             cursor: pointer;
-            font-weight: 600;
-            font-size: 14px;
+            font-weight: 700;
+            font-size: 15px;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
-            gap: 8px;
-        }
-        
-        .control-panel button:hover {
-            background: #ff6600;
+            gap: 10px;
+            letter-spacing: 0.3px;
         }
         
         .control-panel button i {
-            font-size: 14px;
+            font-size: 16px;
         }
         
-        /* PRETRAGA - veća za mobitel, responzivna */
+        .control-panel button:active {
+            background: #ff5500;
+            transform: scale(0.97);
+        }
+        
+        /* PRETRAGA - gore lijevo, ne smeta gumbu */
         .search-container {
             position: absolute; 
             top: 16px; 
@@ -62,15 +62,15 @@
             right: 16px;
             z-index: 1000; 
             background: white;
-            border-radius: 48px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            border-radius: 60px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
             display: flex;
             align-items: center;
             gap: 0;
             backdrop-filter: blur(10px);
             background: rgba(255,255,255,0.98);
             border: 1px solid rgba(0,0,0,0.08);
-            max-width: calc(100% - 140px);
+            max-width: calc(100% - 32px);
         }
         
         .autocomplete-container {
@@ -105,10 +105,10 @@
             background: #ff6600;
             color: white;
             padding: 8px 16px;
-            border-radius: 40px;
-            font-size: 13px;
-            font-weight: 600;
-            margin-right: 8px;
+            border-radius: 60px;
+            font-size: 14px;
+            font-weight: 700;
+            margin-right: 6px;
             white-space: nowrap;
             display: flex;
             align-items: center;
@@ -121,15 +121,15 @@
         
         .autocomplete-list {
             position: absolute;
-            top: calc(100% + 8px);
+            top: calc(100% + 10px);
             left: 0;
             right: 0;
             background: white;
-            border-radius: 20px;
-            max-height: 280px;
+            border-radius: 24px;
+            max-height: 320px;
             overflow-y: auto;
             z-index: 1001;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.25);
             border: 1px solid rgba(0,0,0,0.08);
         }
         
@@ -153,7 +153,7 @@
             color: #ff6600;
             background: #fff0e6;
             padding: 6px 12px;
-            border-radius: 30px;
+            border-radius: 40px;
             font-size: 14px;
             display: inline-flex;
             align-items: center;
@@ -166,41 +166,35 @@
             margin-left: 8px;
         }
         
-        /* Stats donji desni */
+        /* Stats donji desni - mali */
         .stats {
             position: absolute;
             bottom: 20px;
             right: 16px;
-            left: 16px;
             z-index: 1000;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.75);
             backdrop-filter: blur(8px);
             color: white;
-            padding: 10px 16px;
+            padding: 8px 14px;
             border-radius: 40px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 500;
-            letter-spacing: 0.3px;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 8px;
-            text-align: center;
-            width: auto;
-            max-width: calc(100% - 32px);
-            margin: 0 auto;
+            gap: 6px;
             pointer-events: none;
+            white-space: nowrap;
         }
         
         .stats i {
-            font-size: 12px;
+            font-size: 10px;
             opacity: 0.8;
         }
         
-        /* IKONE AUTOBUSA - VEĆE ZA MOBITEL (čitljivije) */
+        /* IKONE AUTOBUSA - optimalne za mobitel i desktop */
         .bus-label {
-            width: 58px;
-            height: 44px;
+            width: 56px;
+            height: 42px;
             border: 2.5px solid #1a1a2e;
             border-radius: 10px;
             overflow: hidden;
@@ -213,17 +207,13 @@
             background: white;
         }
         
-        .bus-label:hover {
-            transform: scale(1.05);
-        }
-        
         .bus-label:active {
-            transform: scale(0.98);
+            transform: scale(0.96);
         }
         
         .bus-label-red {
-            width: 58px;
-            height: 44px;
+            width: 56px;
+            height: 42px;
             border: 2.5px solid #ff2200;
             border-radius: 10px;
             overflow: hidden;
@@ -236,51 +226,47 @@
             background: #ff2200;
         }
         
-        .bus-label-red:hover {
-            transform: scale(1.05);
-        }
-        
         .bus-label-red:active {
-            transform: scale(0.98);
+            transform: scale(0.96);
         }
         
         .bus-top {
             background: white;
             color: #ff6600;
-            height: 22px;
-            line-height: 22px;
+            height: 21px;
+            line-height: 21px;
             font-weight: 800;
-            font-size: 14px;
+            font-size: 13px;
             text-align: center;
         }
         
         .bus-label-red .bus-top {
             background: #ff2200;
             color: white;
-            font-size: 14px;
+            font-size: 13px;
         }
         
         .bus-bottom {
             background: #ffcc00;
             color: #1a1a2e;
-            height: 22px;
-            line-height: 22px;
+            height: 21px;
+            line-height: 21px;
             font-weight: 800;
-            font-size: 13px;
+            font-size: 12px;
             text-align: center;
         }
         
         .bus-bottom-red {
             background: #cc0000;
             color: white;
-            height: 22px;
-            line-height: 22px;
+            height: 21px;
+            line-height: 21px;
             font-weight: 800;
-            font-size: 13px;
+            font-size: 12px;
             text-align: center;
         }
         
-        /* Scrollbar za autocomplete */
+        /* Scrollbar */
         .autocomplete-list::-webkit-scrollbar {
             width: 5px;
         }
@@ -295,23 +281,28 @@
             border-radius: 10px;
         }
         
-        /* MOBITEL RESPONSIVE */
+        /* MOBITEL OPTIMIZACIJA */
         @media (max-width: 768px) {
+            .control-panel {
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+            }
+            
             .control-panel button {
-                padding: 10px 16px;
-                font-size: 12px;
+                padding: 10px 24px;
+                font-size: 14px;
             }
             
             .control-panel button i {
-                font-size: 12px;
+                font-size: 14px;
             }
             
             .search-container {
                 top: 12px;
                 left: 12px;
-                right: auto;
-                max-width: calc(100% - 110px);
-                border-radius: 40px;
+                right: 12px;
+                max-width: calc(100% - 24px);
             }
             
             .search-icon {
@@ -327,7 +318,7 @@
             .bus-count-badge {
                 padding: 6px 12px;
                 font-size: 12px;
-                margin-right: 6px;
+                margin-right: 4px;
             }
             
             .bus-count-badge i {
@@ -342,47 +333,35 @@
                 padding: 12px 14px;
             }
             
-            .autocomplete-gbr {
-                padding: 5px 10px;
-                font-size: 13px;
-            }
-            
-            /* Veće ikone za mobitel */
             .bus-label, .bus-label-red {
-                width: 54px;
+                width: 52px;
                 height: 40px;
             }
             
             .bus-top, .bus-label-red .bus-top {
                 height: 20px;
                 line-height: 20px;
-                font-size: 13px;
+                font-size: 12px;
             }
             
             .bus-bottom, .bus-bottom-red {
                 height: 20px;
                 line-height: 20px;
-                font-size: 12px;
-            }
-        }
-        
-        /* Mali mobiteli */
-        @media (max-width: 480px) {
-            .control-panel button {
-                padding: 8px 14px;
                 font-size: 11px;
             }
             
-            .search-container {
-                max-width: calc(100% - 100px);
+            .stats {
+                bottom: 12px;
+                right: 12px;
+                padding: 6px 10px;
+                font-size: 10px;
             }
-            
-            .bus-count-badge {
-                padding: 5px 10px;
-            }
-            
-            .bus-count-badge i {
-                display: none;
+        }
+        
+        @media (max-width: 480px) {
+            .control-panel button {
+                padding: 9px 20px;
+                font-size: 13px;
             }
             
             .bus-count-badge span {
@@ -390,51 +369,19 @@
             }
             
             .bus-label, .bus-label-red {
-                width: 50px;
+                width: 48px;
                 height: 38px;
             }
             
             .bus-top, .bus-label-red .bus-top {
                 height: 19px;
                 line-height: 19px;
-                font-size: 12px;
+                font-size: 11px;
             }
             
             .bus-bottom, .bus-bottom-red {
                 height: 19px;
                 line-height: 19px;
-                font-size: 11px;
-            }
-            
-            .stats {
-                font-size: 10px;
-                padding: 8px 12px;
-            }
-        }
-        
-        @media (max-width: 380px) {
-            .search-container {
-                max-width: calc(100% - 90px);
-            }
-            
-            .bus-count-badge span {
-                font-size: 10px;
-            }
-            
-            .bus-label, .bus-label-red {
-                width: 46px;
-                height: 36px;
-            }
-            
-            .bus-top, .bus-label-red .bus-top {
-                height: 18px;
-                line-height: 18px;
-                font-size: 11px;
-            }
-            
-            .bus-bottom, .bus-bottom-red {
-                height: 18px;
-                line-height: 18px;
                 font-size: 10px;
             }
         }
@@ -500,8 +447,8 @@
         return L.divIcon({ 
             html: html,
             className: '', 
-            iconSize: [58, 44], 
-            iconAnchor: [29, 22]
+            iconSize: [56, 42], 
+            iconAnchor: [28, 21]
         });
     }
     
@@ -526,7 +473,7 @@
             var routes = stop.routes ? stop.routes.map(r => r.name).join(', ') : '';
             
             var marker = L.circleMarker([lat, lng], {
-                radius: 6,
+                radius: 5,
                 fillColor: "#3388ff",
                 color: "#fff",
                 weight: 1.5,
@@ -625,11 +572,11 @@
             }
             
             var vehicleCount = Object.keys(markers).length;
-            document.getElementById('statsText').innerHTML = `${new Date().toLocaleTimeString('hr-HR')} | ${vehicleCount} vozila`;
+            document.getElementById('statsText').innerHTML = `${new Date().toLocaleTimeString('hr-HR')} | ${vehicleCount}`;
             document.getElementById('busCount').innerHTML = `${vehicleCount}`;
         } catch (error) {
             console.error("Greška:", error);
-            document.getElementById('statsText').innerHTML = 'Greška pri učitavanju';
+            document.getElementById('statsText').innerHTML = 'Greška';
         }
     }
     
