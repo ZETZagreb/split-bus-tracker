@@ -93,8 +93,10 @@
             font-weight: 800; font-size: 12px; text-align: center;
         }
 
+        /* POPUP - SVI PODACI */
         .custom-popup {
-            font-family: 'Inter', sans-serif; min-width: 230px; padding: 6px 0;
+            font-family: 'Inter', sans-serif; min-width: 250px; padding: 6px 0;
+            max-width: 320px;
         }
         .custom-popup .title { font-size: 17px; font-weight: 700; color: #ff6600; margin-bottom: 8px; }
         .custom-popup .row { padding: 4px 0; font-size: 13px; display: flex; justify-content: space-between; border-bottom: 1px solid #f0f0f0; }
@@ -470,7 +472,13 @@
         return date.toLocaleDateString('hr-HR') + ' ' + date.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' });
     }
 
-    function getDirection(lat, lng) {
+    function getDirection(gbr, lat, lng) {
+        // Prvo provjeri zadnji smjer iz busStatus-a
+        if (busStatus[gbr] && busStatus[gbr].lastOkretiste) {
+            return busStatus[gbr].lastOkretiste;
+        }
+        
+        // Ako nema, izračunaj prema najbližem okretištu
         var closest = null;
         var minDist = Infinity;
         for (var key in okretista) {
@@ -534,7 +542,7 @@
     }
 
     // ============================================================
-    // POPUP NA KLIK
+    // POPUP NA KLIK - SVI PODACI + SMJER
     // ============================================================
     function openBusPopup(e) {
         var marker = e.target;
@@ -547,7 +555,7 @@
         
         var vehicle = vehicleData[String(gbr)] || {};
         var time = lastSeen[gbr] || 'Nema podataka';
-        var direction = getDirection(lat, lng);
+        var direction = getDirection(gbr, lat, lng);
         var dirName = direction ? direction.replace('_', ' ') : 'Nepoznat';
         
         var html = `<div class="custom-popup">
@@ -563,7 +571,7 @@
     }
 
     // ============================================================
-    // PRAĆENJE POLAZAKA
+    // PRAĆENJE POLAZAKA - BILJEŽI SMJER ČIM SE ODMAKNE 100m
     // ============================================================
     function checkDeparture(gbr, line, lat, lng) {
         var now = new Date();
@@ -573,32 +581,64 @@
         saveHistory();
 
         if (!busStatus[gbr]) {
-            busStatus[gbr] = { status: 'unknown', lastOkretiste: null };
+            busStatus[gbr] = { status: 'unknown', lastOkretiste: null, lastPosition: { lat: lat, lng: lng } };
         }
+
+        // Ažuriraj poziciju
+        busStatus[gbr].lastPosition = { lat: lat, lng: lng };
+
+        // Provjeri sva okretišta
+        var isOnOkretiste = false;
+        var currentOkretiste = null;
 
         for (var key in okretista) {
             var okr = okretista[key];
             var dist = distance(lat, lng, okr.lat, okr.lng);
             
             if (dist < okr.radius) {
-                if (busStatus[gbr].status === 'driving' && busStatus[gbr].lastOkretiste === key) {
-                    if (!departureLog[gbr]) departureLog[gbr] = [];
-                    departureLog[gbr].push({ tip: 'DOLAZAK', okretiste: key, vrijeme: timeStr, linija: line });
-                    saveDepartures();
-                }
-                busStatus[gbr].status = 'parking';
-                busStatus[gbr].lastOkretiste = key;
-                return;
+                isOnOkretiste = true;
+                currentOkretiste = key;
+                break;
             }
         }
 
-        if (busStatus[gbr].status === 'parking' && busStatus[gbr].lastOkretiste) {
-            if (!departureLog[gbr]) departureLog[gbr] = [];
-            departureLog[gbr].push({ tip: 'POLAZAK', okretiste: busStatus[gbr].lastOkretiste, vrijeme: timeStr, linija: line });
-            saveDepartures();
-            busStatus[gbr].status = 'driving';
+        if (isOnOkretiste) {
+            // AUTOBUS JE NA OKRETIŠTU
+            if (busStatus[gbr].status === 'driving' && busStatus[gbr].lastOkretiste === currentOkretiste) {
+                // DOŠAO NA OKRETIŠTE - ZAVRŠIO VOŽNJU
+                if (!departureLog[gbr]) departureLog[gbr] = [];
+                departureLog[gbr].push({ 
+                    tip: 'DOLAZAK', 
+                    okretiste: currentOkretiste, 
+                    vrijeme: timeStr, 
+                    linija: line 
+                });
+                saveDepartures();
+            }
+            busStatus[gbr].status = 'parking';
+            busStatus[gbr].lastOkretiste = currentOkretiste;
         } else {
-            busStatus[gbr].status = 'driving';
+            // AUTOBUS NIJE NA OKRETIŠTU - PROVJERI JE LI KRENUO
+            if (busStatus[gbr].status === 'parking' && busStatus[gbr].lastOkretiste) {
+                // KRENUO S OKRETIŠTA (udaljio se više od 100m)
+                var lastOkr = okretista[busStatus[gbr].lastOkretiste];
+                var distFromLastOkr = distance(lat, lng, lastOkr.lat, lastOkr.lng);
+                
+                if (distFromLastOkr > 100) {
+                    // BILJEŽI POLAZAK
+                    if (!departureLog[gbr]) departureLog[gbr] = [];
+                    departureLog[gbr].push({ 
+                        tip: 'POLAZAK', 
+                        okretiste: busStatus[gbr].lastOkretiste, 
+                        vrijeme: timeStr, 
+                        linija: line 
+                    });
+                    saveDepartures();
+                    busStatus[gbr].status = 'driving';
+                }
+            } else {
+                busStatus[gbr].status = 'driving';
+            }
         }
     }
 
@@ -619,7 +659,7 @@
     }
 
     // ============================================================
-    // POPIS SVIH VOZILA - ČISTA VERZIJA (bez broja polazaka)
+    // POPIS SVIH VOZILA
     // ============================================================
     function renderFullList() {
         var list = document.getElementById('historyList');
