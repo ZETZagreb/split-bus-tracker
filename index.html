@@ -386,134 +386,55 @@
     var allStops = [];
     var stopMarkers = [];
     var stopsVisible = false;
+    var tripsCache = {};
 
     // ============================================================
-    // 3. TOČNA OKRETIŠTA ZA SVAKU LINIJU
+    // 3. DOHVATI TRIPOVE (ZA SMJER)
     // ============================================================
-    var linijeOkretista = {
-        "1": { prva: "H N K", prvaLat: 43.51083, prvaLng: 16.43848, zadnja: "SPINUT - STUDENTSKI DOM", zadnjaLat: 43.51510, zadnjaLng: 16.42376 },
-        "2": { prva: "MATOŠEVA 2", prvaLat: 43.51313, prvaLng: 16.42962, zadnja: "ZRAČNA LUKA 1", zadnjaLat: 43.53502, zadnjaLng: 16.29918 },
-        "2A": { prva: "DOMOVINSKOG RATA - BRODARICA 1", prvaLat: 43.51827, prvaLng: 16.44759, zadnja: "ZRAČNA LUKA 1", zadnjaLat: 43.53502, zadnjaLng: 16.29918 },
-        "3": { prva: "DOMOVINSKOG RATA - BRODARICA 2", prvaLat: 43.51927, prvaLng: 16.44863, zadnja: "BRDA OKRETIŠTE", zadnjaLat: 43.52165, zadnjaLng: 16.47277 },
-        "3A": { prva: "DOMOVINSKOG RATA - BRODARICA 1", prvaLat: 43.51827, prvaLng: 16.44759, zadnja: "BRDA OKRETIŠTE", zadnjaLat: 43.52165, zadnjaLng: 16.47277 },
-        "5": { prva: "H N K", prvaLat: 43.51083, prvaLng: 16.43848, zadnja: "ZBORA NARODNE GARDE - MALL OF SPLIT 1", zadnjaLat: 43.51900, zadnjaLng: 16.48182 },
-        "5A": { prva: "H N K", prvaLat: 43.51083, prvaLng: 16.43848, zadnja: "ZBORA NARODNE GARDE - MALL OF SPLIT 1", zadnjaLat: 43.51900, zadnjaLng: 16.48182 },
-        "6": { prva: "H N K", prvaLat: 43.51083, prvaLng: 16.43848, zadnja: "VUKOVARSKA - LOVRINAC", zadnjaLat: 43.51488, zadnjaLng: 16.49349 },
-        "7": { prva: "BENE", prvaLat: 43.51377, prvaLng: 16.40275, zadnja: "ŽNJAN OKRETIŠTE", zadnjaLat: 43.50705, zadnjaLng: 16.48334 },
-        "8": { prva: "BENE", prvaLat: 43.51377, prvaLng: 16.40275, zadnja: "ŽNJAN OKRETIŠTE", zadnjaLat: 43.50705, zadnjaLng: 16.48334 },
-        "9": { prva: "DOMOVINSKOG RATA - BRODARICA 1", prvaLat: 43.51827, prvaLng: 16.44759, zadnja: "ZAGORSKI PUT - PUJANKE 2", zadnjaLat: 43.51853, zadnjaLng: 16.47184 },
-        "10": { prva: "DOMOVINSKOG RATA - BRODARICA 1", prvaLat: 43.51827, prvaLng: 16.44759, zadnja: "DOMOVINSKOG RATA - KMAN SJEVER", zadnjaLat: 43.52022, zadnjaLng: 16.45586 },
-        "11": { prva: "SPINUT - STUDENTSKI DOM", prvaLat: 43.51510, prvaLng: 16.42376, zadnja: "HRVATSKE MORNARICE - GLAVIČINE", zadnjaLat: 43.51842, zadnjaLng: 16.44069 },
-        "12": { prva: "PLAŽA KAŠJUNI 1", prvaLat: 43.50526, prvaLng: 16.40344, zadnja: "MEDITERANSKI INSTITUT 1", zadnjaLat: 43.50524, zadnjaLng: 16.40719 },
-        "13": { prva: "SPINUT - STUDENTSKI DOM", prvaLat: 43.51510, prvaLng: 16.42376, zadnja: "PLAŽA ŽNJAN ISTOK 1", zadnjaLat: 43.50204, zadnjaLng: 16.48413 },
-        "14": { prva: "BOLNICA FIRULE 1", prvaLat: 43.50522, prvaLng: 16.45688, zadnja: "DUILOVO - OKRETIŠTE", zadnjaLat: 43.50438, zadnjaLng: 16.49520 },
-        "15": { prva: "VUKOVARSKA - OPĆINA", prvaLat: 43.51237, prvaLng: 16.44315, zadnja: "VELEBITSKA - RADOŠEVAC", zadnjaLat: 43.50580, zadnjaLng: 16.47857 },
-        "16": { prva: "H N K", prvaLat: 43.51083, prvaLng: 16.43848, zadnja: "KLIS BRDO 1", zadnjaLat: 43.57534, zadnjaLng: 16.53448 },
-        "17": { prva: "SPINUT - STUDENTSKI DOM", prvaLat: 43.51510, prvaLng: 16.42376, zadnja: "LORA 1", zadnjaLat: 43.52304, zadnjaLng: 16.43303 },
-        "18": { prva: "H N K", prvaLat: 43.51083, prvaLng: 16.43848, zadnja: "SIROBUJA OKRETIŠTE", zadnjaLat: 43.50741, zadnjaLng: 16.50837 },
-        "20": { prva: "GUNJAČINA - MUZEJ HAS", prvaLat: 43.50431, prvaLng: 16.42336, zadnja: "BRDA OKRETIŠTE", zadnjaLat: 43.52165, zadnjaLng: 16.47277 },
-        "21": { prva: "SUPILOVA", prvaLat: 43.50540, prvaLng: 16.41867, zadnja: "TRAJEKTNA LUKA", zadnjaLat: 43.50288, zadnjaLng: 16.44306 },
-        "22": { prva: "H N K", prvaLat: 43.51083, prvaLng: 16.43848, zadnja: "KLIS BRDO 1", zadnjaLat: 43.57534, zadnjaLng: 16.53448 },
-        "24": { prva: "MATOŠEVA 1", prvaLat: 43.51311, prvaLng: 16.43102, zadnja: "SIROBUJA", zadnjaLat: 43.50619, zadnjaLng: 16.51998 },
-        "25": { prva: "MATOŠEVA 1", prvaLat: 43.51311, prvaLng: 16.43102, zadnja: "STOBREČ KAMP 1", zadnjaLat: 43.50373, zadnjaLng: 16.52587 },
-        "26": { prva: "MATOŠEVA 1", prvaLat: 43.51311, prvaLng: 16.43102, zadnja: "ŠINE 1", zadnjaLat: 43.50650, zadnjaLng: 16.52365 },
-        "27": { prva: "MATOŠEVA 1", prvaLat: 43.51311, prvaLng: 16.43102, zadnja: "STOBREČ KAMP 1", zadnjaLat: 43.50373, zadnjaLng: 16.52587 },
-        "28": { prva: "MATOŠEVA 1", prvaLat: 43.51311, prvaLng: 16.43102, zadnja: "SITNO GORNJE", zadnjaLat: 43.51692, zadnjaLng: 16.61048 },
-        "29": { prva: "MATOŠEVA 1", prvaLat: 43.51311, prvaLng: 16.43102, zadnja: "GATA DOM 1", zadnjaLat: 43.46365, zadnjaLng: 16.71191 },
-        "30": { prva: "MATOŠEVA 1", prvaLat: 43.51311, prvaLng: 16.43102, zadnja: "MUTOGRAS", zadnjaLat: 43.46587, zadnjaLng: 16.57930 },
-        "31": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "TVORNICA VRANJIC 1", zadnjaLat: 43.53118, zadnjaLng: 16.47133 },
-        "32": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "KUČINE", zadnjaLat: 43.52870, zadnjaLng: 16.53250 },
-        "33": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "KLIS KOSA OKRETIŠTE", zadnjaLat: 43.55846, zadnjaLng: 16.53503 },
-        "35": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "DOLAC GORNJI 1", zadnjaLat: 43.49667, zadnjaLng: 16.73346 },
-        "36": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "KLIS GRLO 1", zadnjaLat: 43.57304, zadnjaLng: 16.53175 },
-        "37": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "TROGIR", zadnjaLat: 43.51800, zadnjaLng: 16.25100 },
-        "38": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "ZRAČNA LUKA OKRETIŠTE", zadnjaLat: 43.53423, zadnjaLng: 16.29658 },
-        "39": { prva: "KAŠTEL STARI - CENTAR 1", prvaLat: 43.55268, prvaLng: 16.34280, zadnja: "KAŠTEL ŠTAFILIĆ - NEHAJ 2", zadnjaLat: 43.54964, zadnjaLng: 16.32792 },
-        "39A": { prva: "KAŠTEL STARI - CENTAR 1", prvaLat: 43.55268, prvaLng: 16.34280, zadnja: "KAŠTEL ŠTAFILIĆ - NEHAJ 2", zadnjaLat: 43.54964, zadnjaLng: 16.32792 },
-        "40": { prva: "H N K", prvaLat: 43.51083, prvaLng: 16.43848, zadnja: "VUKOVARSKA - LOVRINAC", zadnjaLat: 43.51488, zadnjaLng: 16.49349 },
-        "41": { prva: "PANTANA 1", prvaLat: 43.53046, prvaLng: 16.27716, zadnja: "PLANO MALJKOVIĆI 3 - PRGOMET", zadnjaLat: 43.56297, zadnjaLng: 16.25357 },
-        "42": { prva: "MIŠEVAC 1", prvaLat: 43.51340, prvaLng: 16.27957, zadnja: "SLATINE OKRETIŠTE", zadnjaLat: 43.49955, zadnjaLng: 16.33810 },
-        "44": { prva: "MARINOVA DRAGA 1", prvaLat: 43.50755, prvaLng: 16.25840, zadnja: "OKRUG DONJI OKRETIŠTE", zadnjaLat: 43.49763, zadnjaLng: 16.21832 },
-        "45": { prva: "SEGET DONJI 1", prvaLat: 43.51886, prvaLng: 16.23013, zadnja: "SEGET VRANJICA - OKRETIŠTE", zadnjaLat: 43.51318, zadnjaLng: 16.19159 },
-        "48": { prva: "SEGET DONJI 1", prvaLat: 43.51886, prvaLng: 16.23013, zadnja: "DOGRADE OKRETIŠTE", zadnjaLat: 43.54266, zadnjaLng: 16.11155 },
-        "49": { prva: "SEGET DONJI 1", prvaLat: 43.51886, prvaLng: 16.23013, zadnja: "VINIŠĆE OKRETIŠTE", zadnjaLat: 43.48673, zadnjaLng: 16.10958 },
-        "50": { prva: "SEGET DONJI 1", prvaLat: 43.51886, prvaLng: 16.23013, zadnja: "SEVID OKRETIŠTE", zadnjaLat: 43.49977, zadnjaLng: 16.02850 },
-        "51": { prva: "SEGET DONJI 1", prvaLat: 43.51886, prvaLng: 16.23013, zadnja: "LJUBITOVICA OKRETIŠTE", zadnjaLat: 43.62294, zadnjaLng: 16.13733 },
-        "52": { prva: "SEGET DONJI 1", prvaLat: 43.51886, prvaLng: 16.23013, zadnja: "VINOVAC OKRETIŠTE", zadnjaLat: 43.59310, zadnjaLng: 16.05495 },
-        "55": { prva: "ROGAČ OKRETIŠTE", prvaLat: 43.39673, prvaLng: 16.30051, zadnja: "GORNJE SELO 1", zadnjaLat: 43.35433, zadnjaLng: 16.34179 },
-        "56": { prva: "ROGAČ OKRETIŠTE", prvaLat: 43.39673, prvaLng: 16.30051, zadnja: "MASLINICA OKRETIŠTE", zadnjaLat: 43.39796, zadnjaLng: 16.20739 },
-        "60": { prva: "OPĆINA 1", prvaLat: 43.51287, prvaLng: 16.44270, zadnja: "RAVNIČKI MOST", zadnjaLat: 43.42557, zadnjaLng: 16.71155 },
-        "67": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "DOLAC GORNJI 1", zadnjaLat: 43.49667, zadnjaLng: 16.73346 },
-        "68": { prva: "OPĆINA 1", prvaLat: 43.51287, prvaLng: 16.44270, zadnja: "BLATO NA CETINI MOST 1", zadnjaLat: 43.47915, zadnjaLng: 16.84550 },
-        "69": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "TRNBUSI TOMIĆI 1", zadnjaLat: 43.49002, zadnjaLng: 16.80774 },
-        "70": { prva: "BISKO CENTAR 1", prvaLat: 43.57605, prvaLng: 16.68880, zadnja: "OKRETIŠTE GRAB", zadnjaLat: 43.64390, zadnjaLng: 16.75319 },
-        "71": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "NEORIĆ CENTAR 1", zadnjaLat: 43.68411, zadnjaLng: 16.51954 },
-        "73": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "PRALIJE 1", zadnjaLat: 43.74390, zadnjaLng: 16.42110 },
-        "76": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "NEORIĆ MIRIT 1", zadnjaLat: 43.67576, zadnjaLng: 16.51226 },
-        "77": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "CRIVAC VRČ 1", zadnjaLat: 43.75918, zadnjaLng: 16.34929 },
-        "80": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "DRNIŠ", zadnjaLat: 43.85958, zadnjaLng: 16.15869 },
-        "81": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "NISKO OKRETIŠTE", zadnjaLat: 43.66577, zadnjaLng: 16.35557 },
-        "86": { prva: "HRVATSKE MORNARICE - GLAVIČINE", prvaLat: 43.51842, prvaLng: 16.44069, zadnja: "KLADNJICE 1", zadnjaLat: 43.67230, zadnjaLng: 16.30073 },
-        "90": { prva: "KAŠTEL STARI - ŠKOLA 2", prvaLat: 43.55377, prvaLng: 16.34592, zadnja: "SITNO", zadnjaLat: 43.67059, zadnjaLng: 16.16573 },
-        "91": { prva: "KAŠTEL STARI - ŠKOLA 1", prvaLat: 43.55395, prvaLng: 16.34736, zadnja: "DIVOJEVIĆI LOKVA 1", zadnjaLat: 43.67433, zadnjaLng: 16.25945 },
-        "93": { prva: "KAŠTEL STARI - ŠKOLA 1", prvaLat: 43.55395, prvaLng: 16.34736, zadnja: "RADOŠIĆ BARAĆI 1", zadnjaLat: 43.61872, zadnjaLng: 16.28374 },
-        "199": { prva: "SPINUT - STUDENTSKI DOM", prvaLat: 43.51510, prvaLng: 16.42376, zadnja: "KOPILICA", zadnjaLat: 43.52325, zadnjaLng: 16.45058 },
-        "200": { prva: "VELEBITSKA - RADOŠEVAC", prvaLat: 43.50580, prvaLng: 16.47857, zadnja: "ZBORA NARODNE GARDE - MALL OF SPLIT 1", zadnjaLat: 43.51900, zadnjaLng: 16.48182 },
-        "201": { prva: "H N K", prvaLat: 43.51083, prvaLng: 16.43848, zadnja: "ZBORA NARODNE GARDE - MERTOJAK", zadnjaLat: 43.51102, zadnjaLng: 16.48541 },
-        "202": { prva: "ŽRNOVNICA ŠKOLA 2", prvaLat: 43.52017, prvaLng: 16.54878, zadnja: "PRIVOR", zadnjaLat: 43.52607, zadnjaLng: 16.55349 }
-    };
-
-    // ============================================================
-    // 4. POMOĆNE FUNKCIJE
-    // ============================================================
-    function formatTime(d) {
-        return d.toLocaleDateString('hr-HR') + ' ' + d.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' });
+    async function fetchTrips() {
+        try {
+            var resp = await fetch(`https://www.bus-split.com/api/trips?count=30&t=${Date.now()}`);
+            var data = await resp.json();
+            // Grupiraj po liniji
+            tripsCache = {};
+            data.forEach(trip => {
+                var line = trip.name;
+                if (!tripsCache[line]) tripsCache[line] = [];
+                tripsCache[line].push(trip);
+            });
+            console.log('Učitano tripova:', data.length);
+            return tripsCache;
+        } catch(e) {
+            console.error('Greška pri dohvatu tripova:', e);
+            return {};
+        }
     }
 
-    function getDirection(gbr, line, lat, lng) {
-        // Ako imamo zapamćeni smjer iz busStatus-a - koristi ga
-        if (busStatus[gbr] && busStatus[gbr].lastDirection) {
-            return busStatus[gbr].lastDirection;
-        }
+    // ============================================================
+    // 4. DOHVAĆANJE SMJERA IZ TRIPOVA
+    // ============================================================
+    function getDirectionFromTrips(line, lat, lng) {
+        var trips = tripsCache[line];
+        if (!trips || trips.length === 0) return null;
         
-        // Ako nema, provjeri za ovu liniju koja su okretišta
-        var okr = linijeOkretista[line];
-        if (!okr) return 'Nepoznat';
+        // Pronađi trip koji je najbliži trenutnom vremenu
+        var now = new Date();
+        var closestTrip = null;
+        var minDiff = Infinity;
         
-        // Izračunaj udaljenost do prve i zadnje stanice
-        var R = 6371000;
-        function dist(lat1, lon1, lat2, lon2) {
-            var dLat = (lat2 - lat1) * Math.PI / 180;
-            var dLon = (lon2 - lon1) * Math.PI / 180;
-            var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                    Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
+        trips.forEach(trip => {
+            var tripTime = new Date(trip.plannedArrivalTime || trip.expectedArrivalTime);
+            var diff = Math.abs(tripTime - now);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestTrip = trip;
+            }
+        });
         
-        var distPrva = dist(lat, lng, okr.prvaLat, okr.prvaLng);
-        var distZadnja = dist(lat, lng, okr.zadnjaLat, okr.zadnjaLng);
-        
-        // Ako je blizu prve stanice (< 300m) - ide prema zadnjoj
-        if (distPrva < 300) {
-            return okr.zadnja;
+        if (closestTrip && closestTrip.pathwayName) {
+            return closestTrip.pathwayName;
         }
-        // Ako je blizu zadnje stanice (< 300m) - ide prema prvoj
-        else if (distZadnja < 300) {
-            return okr.prva;
-        }
-        
-        // Ako je negdje između, vrati zadnji zapamćeni ili prvu stanicu
-        if (busStatus[gbr] && busStatus[gbr].lastDirection) {
-            return busStatus[gbr].lastDirection;
-        }
-        
-        // Ako je blizu prve, ide prema zadnjoj
-        if (distPrva < distZadnja) {
-            return okr.zadnja;
-        } else {
-            return okr.prva;
-        }
+        return null;
     }
 
     // ============================================================
@@ -542,8 +463,10 @@
         if (!gbr || !line) return;
 
         var v = vehicleData[gbr] || {};
-        var dir = getDirection(gbr, line, m.getLatLng().lat, m.getLatLng().lng);
-        var dirName = dir ? dir.replace(/_/g, ' ') : 'Nepoznat';
+        
+        // Dohvati smjer iz tripova
+        var dirName = getDirectionFromTrips(line, m.getLatLng().lat, m.getLatLng().lng);
+        if (!dirName) dirName = 'Nepoznat';
 
         var html = `<div style="font-family:Arial,sans-serif;min-width:200px;padding:4px 0;">
             <div style="color:#ff6600;font-weight:700;font-size:16px;margin-bottom:6px;">🚌 Linija ${line}</div>
@@ -635,6 +558,11 @@
             var vehicles = data.vehicles;
             var currentGbrs = vehicles.map(v => v.garageNumber);
 
+            // Prvo dohvati trips ako nisu u cache-u
+            if (Object.keys(tripsCache).length === 0) {
+                await fetchTrips();
+            }
+
             vehicles.forEach(bus => {
                 var gbr = bus.garageNumber;
                 var line = bus.name;
@@ -644,13 +572,6 @@
                 var now = new Date();
                 lastSeen[gbr] = formatTime(now);
                 try { localStorage.setItem('busLastSeen', JSON.stringify(lastSeen)); } catch(e) {}
-
-                // Ažuriraj smjer za ovaj autobus
-                var dir = getDirection(gbr, line, lat, lng);
-                if (dir && dir !== 'Nepoznat') {
-                    if (!busStatus[gbr]) busStatus[gbr] = {};
-                    busStatus[gbr].lastDirection = dir;
-                }
 
                 var icon = createIcon(line, gbr);
                 if (markers[gbr]) {
@@ -681,6 +602,10 @@
             console.error(e);
             document.getElementById('statsText').innerHTML = 'Greška';
         }
+    }
+
+    function formatTime(d) {
+        return d.toLocaleDateString('hr-HR') + ' ' + d.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' });
     }
 
     // ============================================================
@@ -716,6 +641,7 @@
     map.on('dblclick', togglePanel);
 
     loadStops();
+    fetchTrips();
     fetchLiveBuses();
     setInterval(fetchLiveBuses, 7000);
 </script>
