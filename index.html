@@ -473,12 +473,9 @@
     }
 
     function getDirection(gbr, lat, lng) {
-        // Prvo provjeri zadnji smjer iz busStatus-a
         if (busStatus[gbr] && busStatus[gbr].lastOkretiste) {
             return busStatus[gbr].lastOkretiste;
         }
-        
-        // Ako nema, izračunaj prema najbližem okretištu
         var closest = null;
         var minDist = Infinity;
         for (var key in okretista) {
@@ -571,7 +568,7 @@
     }
 
     // ============================================================
-    // PRAĆENJE POLAZAKA - BILJEŽI SMJER ČIM SE ODMAKNE 100m
+    // PRAĆENJE POLAZAKA
     // ============================================================
     function checkDeparture(gbr, line, lat, lng) {
         var now = new Date();
@@ -584,17 +581,14 @@
             busStatus[gbr] = { status: 'unknown', lastOkretiste: null, lastPosition: { lat: lat, lng: lng } };
         }
 
-        // Ažuriraj poziciju
         busStatus[gbr].lastPosition = { lat: lat, lng: lng };
 
-        // Provjeri sva okretišta
         var isOnOkretiste = false;
         var currentOkretiste = null;
 
         for (var key in okretista) {
             var okr = okretista[key];
             var dist = distance(lat, lng, okr.lat, okr.lng);
-            
             if (dist < okr.radius) {
                 isOnOkretiste = true;
                 currentOkretiste = key;
@@ -603,9 +597,7 @@
         }
 
         if (isOnOkretiste) {
-            // AUTOBUS JE NA OKRETIŠTU
             if (busStatus[gbr].status === 'driving' && busStatus[gbr].lastOkretiste === currentOkretiste) {
-                // DOŠAO NA OKRETIŠTE - ZAVRŠIO VOŽNJU
                 if (!departureLog[gbr]) departureLog[gbr] = [];
                 departureLog[gbr].push({ 
                     tip: 'DOLAZAK', 
@@ -618,14 +610,10 @@
             busStatus[gbr].status = 'parking';
             busStatus[gbr].lastOkretiste = currentOkretiste;
         } else {
-            // AUTOBUS NIJE NA OKRETIŠTU - PROVJERI JE LI KRENUO
             if (busStatus[gbr].status === 'parking' && busStatus[gbr].lastOkretiste) {
-                // KRENUO S OKRETIŠTA (udaljio se više od 100m)
                 var lastOkr = okretista[busStatus[gbr].lastOkretiste];
                 var distFromLastOkr = distance(lat, lng, lastOkr.lat, lastOkr.lng);
-                
                 if (distFromLastOkr > 100) {
-                    // BILJEŽI POLAZAK
                     if (!departureLog[gbr]) departureLog[gbr] = [];
                     departureLog[gbr].push({ 
                         tip: 'POLAZAK', 
@@ -663,14 +651,12 @@
     // ============================================================
     function renderFullList() {
         var list = document.getElementById('historyList');
-        
         var html = '';
 
         allGbrList.forEach(gbr => {
             var time = lastSeen[gbr] || 'Nema podataka';
             var marker = markers[gbr];
             var line = marker ? (marker.busData?.name || '') : '';
-            
             var statusClass = (time !== 'Nema podataka') ? '' : 'nodata';
             var lineDisplay = line || '-';
             
