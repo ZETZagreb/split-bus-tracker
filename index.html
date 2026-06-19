@@ -51,7 +51,6 @@
             border-radius: 30px; font-size: 11px;
         }
 
-        /* STARI IZGLED IKONA */
         .bus-label {
             width: 50px;
             height: 36px;
@@ -387,23 +386,67 @@
     var allStops = [];
     var stopMarkers = [];
     var stopsVisible = false;
+    var okretista = {};
 
     // ============================================================
-    // 3. OKRETIŠTA (PRAVA OKRETIŠTA)
+    // 3. AUTOMATSKO PREPOZNAVANJE OKRETIŠTA IZ stops.json
     // ============================================================
-    var okretista = {
-        "SUKOISAN": { lat: 43.51561, lng: 16.44330, radius: 120 },
-        "TROGIR": { lat: 43.51800, lng: 16.25100, radius: 120 },
-        "OMIS": { lat: 43.44000, lng: 16.68800, radius: 120 },
-        "RAVNICKI_MOST": { lat: 43.42557, lng: 16.71155, radius: 120 },
-        "DUBRAVA": { lat: 43.64255, lng: 16.50088, radius: 120 },
-        "HNK": { lat: 43.51083, lng: 16.43848, radius: 120 },
-        "KAMEN": { lat: 43.54230, lng: 16.50500, radius: 120 },
-        "STOBREC": { lat: 43.50300, lng: 16.52200, radius: 120 },
-        "KLIS": { lat: 43.55900, lng: 16.52000, radius: 120 },
-        "SOLIN": { lat: 43.53800, lng: 16.49000, radius: 120 },
-        "KASTELA": { lat: 43.54800, lng: 16.38000, radius: 150 }
-    };
+    function pronadjiOkretista() {
+        if (allStops.length === 0) {
+            console.log('Čekam da se stanice učitaju...');
+            return;
+        }
+        
+        var linije = {};
+        allStops.forEach(stop => {
+            if (!stop.routes) return;
+            stop.routes.forEach(route => {
+                var line = route.name;
+                if (!linije[line]) linije[line] = [];
+                var exists = linije[line].some(s => s.id === stop.id);
+                if (!exists) linije[line].push(stop);
+            });
+        });
+        
+        for (var line in linije) {
+            var stops = linije[line];
+            if (stops.length < 2) continue;
+            stops.sort((a,b) => a.id - b.id);
+            
+            var first = stops[0];
+            var last = stops[stops.length - 1];
+            
+            var firstKey = first.name.replace(/ /g, '_').toUpperCase();
+            if (!okretista[firstKey]) {
+                okretista[firstKey] = {
+                    lat: first.geography.coordinates[1],
+                    lng: first.geography.coordinates[0],
+                    radius: 120,
+                    linije: [line]
+                };
+            } else {
+                if (!okretista[firstKey].linije.includes(line)) {
+                    okretista[firstKey].linije.push(line);
+                }
+            }
+            
+            var lastKey = last.name.replace(/ /g, '_').toUpperCase();
+            if (!okretista[lastKey]) {
+                okretista[lastKey] = {
+                    lat: last.geography.coordinates[1],
+                    lng: last.geography.coordinates[0],
+                    radius: 120,
+                    linije: [line]
+                };
+            } else {
+                if (!okretista[lastKey].linije.includes(line)) {
+                    okretista[lastKey].linije.push(line);
+                }
+            }
+        }
+        
+        console.log('Pronađeno okretišta:', Object.keys(okretista).length);
+    }
 
     // ============================================================
     // 4. POMOĆNE FUNKCIJE
@@ -426,7 +469,7 @@
     }
 
     // ============================================================
-    // 5. STARI IZGLED IKONA
+    // 5. IKONE - STARI IZGLED
     // ============================================================
     function createIcon(lineName, garageNumber) {
         var isSpecial = (garageNumber == '307' || garageNumber == '308');
@@ -442,7 +485,7 @@
     }
 
     // ============================================================
-    // 6. KLIK NA AUTOBUS - POPUP BEZ "ZADNJI PUT VIĐEN"
+    // 6. KLIK NA AUTOBUS
     // ============================================================
     function onBusClick(e) {
         var m = e.target;
@@ -480,6 +523,7 @@
             .then(r => r.json())
             .then(stops => {
                 allStops = stops;
+                pronadjiOkretista();
                 console.log('Učitano stanica:', stops.length);
             })
             .catch(e => console.error('Greška:', e));
@@ -560,7 +604,11 @@
                 for (var key in okretista) {
                     var okr = okretista[key];
                     var d = Math.sqrt(Math.pow(lat - okr.lat, 2) + Math.pow(lng - okr.lng, 2));
-                    if (d < 0.001) { isNear = true; busStatus[gbr].lastOkretiste = key; break; }
+                    if (d < 0.001) { 
+                        isNear = true; 
+                        busStatus[gbr].lastOkretiste = key; 
+                        break; 
+                    }
                 }
 
                 var icon = createIcon(line, gbr);
