@@ -388,42 +388,44 @@
     var stopsVisible = false;
 
     // ============================================================
-    // 3. OKRETIŠTA - SAMO GLAVNA (TOČNE KOORDINATE)
+    // 3. OKRETIŠTA ZA SVAKU LINIJU (AUTOMATSKI IZ stops.json)
     // ============================================================
-    var okretista = {
-        "SUKOISAN": { lat: 43.51561, lng: 16.44330, radius: 80 },
-        "TROGIR": { lat: 43.51800, lng: 16.25100, radius: 80 },
-        "OMIS": { lat: 43.44000, lng: 16.68800, radius: 80 },
-        "RAVNICKI_MOST": { lat: 43.42557, lng: 16.71155, radius: 80 },
-        "DUBRAVA": { lat: 43.64255, lng: 16.50088, radius: 80 },
-        "SITNO_GORNJE": { lat: 43.51692, lng: 16.61048, radius: 80 },
-        "KLIS": { lat: 43.55900, lng: 16.52000, radius: 80 },
-        "SOLIN": { lat: 43.53800, lng: 16.49000, radius: 80 },
-        "KASTEL_STARI": { lat: 43.55268, lng: 16.34280, radius: 80 },
-        "STOBREC": { lat: 43.50300, lng: 16.52200, radius: 80 },
-        "DUGOPOLJE": { lat: 43.58234, lng: 16.59602, radius: 80 },
-        "HNK": { lat: 43.51083, lng: 16.43848, radius: 80 },
-        "ZRNOVNICA": { lat: 43.51747, lng: 16.55546, radius: 80 },
-        "TRSTENIK": { lat: 43.50541, lng: 16.47104, radius: 80 },
-        "KAMEN": { lat: 43.54230, lng: 16.50500, radius: 80 },
-        "PRUGOVO": { lat: 43.62648, lng: 16.48692, radius: 80 },
-        "NEORIC": { lat: 43.68399, lng: 16.51941, radius: 80 },
-        "MUC": { lat: 43.68874, lng: 16.49437, radius: 80 },
-        "BISKO": { lat: 43.57605, lng: 16.68880, radius: 80 },
-        "DOLAC": { lat: 43.51949, lng: 16.69750, radius: 80 },
-        "GATA": { lat: 43.46365, lng: 16.71191, radius: 80 },
-        "PODGRADE": { lat: 43.45339, lng: 16.80104, radius: 80 },
-        "KREŠEVO": { lat: 43.47340, lng: 16.87183, radius: 80 },
-        "BLATO_NA_CETINI": { lat: 43.47915, lng: 16.84550, radius: 80 },
-        "KATUNI": { lat: 43.46130, lng: 16.90019, radius: 80 },
-        "KONJSKO": { lat: 43.59381, lng: 16.51604, radius: 80 },
-        "ZNJAN": { lat: 43.50705, lng: 16.48334, radius: 80 },
-        "DUILOVO": { lat: 43.50438, lng: 16.49520, radius: 80 },
-        "BOLNICA_FIRULE": { lat: 43.50522, lng: 16.45688, radius: 80 },
-        "BOLNICA_KRIZINE": { lat: 43.50663, lng: 16.46556, radius: 80 },
-        "MERTOJAK": { lat: 43.50804, lng: 16.47648, radius: 80 },
-        "POJISAN": { lat: 43.50490, lng: 16.44989, radius: 80 }
-    };
+    var linijeOkretista = {};
+
+    function pronadjiOkretistaZaLinije() {
+        if (allStops.length === 0) return;
+        
+        var linije = {};
+        allStops.forEach(stop => {
+            if (!stop.routes) return;
+            stop.routes.forEach(route => {
+                var line = route.name;
+                if (!linije[line]) linije[line] = [];
+                var exists = linije[line].some(s => s.id === stop.id);
+                if (!exists) linije[line].push(stop);
+            });
+        });
+        
+        for (var line in linije) {
+            var stops = linije[line];
+            if (stops.length < 2) continue;
+            stops.sort((a,b) => a.id - b.id);
+            
+            var prva = stops[0];
+            var zadnja = stops[stops.length - 1];
+            
+            linijeOkretista[line] = {
+                prva: prva.name,
+                zadnja: zadnja.name,
+                prvaLat: prva.geography.coordinates[1],
+                prvaLng: prva.geography.coordinates[0],
+                zadnjaLat: zadnja.geography.coordinates[1],
+                zadnjaLng: zadnja.geography.coordinates[0]
+            };
+        }
+        
+        console.log('Pronađena okretišta za linije:', Object.keys(linijeOkretista).length);
+    }
 
     // ============================================================
     // 4. POMOĆNE FUNKCIJE
@@ -432,7 +434,6 @@
         return d.toLocaleDateString('hr-HR') + ' ' + d.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' });
     }
 
-    // IZRAČUN UDALJENOSTI U METRIMA
     function distance(lat1, lon1, lat2, lon2) {
         var R = 6371000;
         var dLat = (lat2 - lat1) * Math.PI / 180;
@@ -444,23 +445,28 @@
         return R * c;
     }
 
-    function getDirection(gbr, lat, lng) {
-        // Prvo provjeri zadnji zapamćeni smjer
-        if (busStatus[gbr] && busStatus[gbr].lastOkretiste) {
-            return busStatus[gbr].lastOkretiste;
+    function getDirection(gbr, line, lat, lng) {
+        // Ako imamo zapamćeni smjer iz busStatus-a - koristi ga
+        if (busStatus[gbr] && busStatus[gbr].lastDirection) {
+            return busStatus[gbr].lastDirection;
         }
         
-        // Ako nema, nađi najbliže okretište
-        var closest = null, minDist = Infinity;
-        for (var key in okretista) {
-            var okr = okretista[key];
-            var d = distance(lat, lng, okr.lat, okr.lng);
-            if (d < minDist) {
-                minDist = d;
-                closest = key;
-            }
+        // Ako nema, provjeri za ovu liniju koja su okretišta
+        var okr = linijeOkretista[line];
+        if (!okr) return 'Nepoznat';
+        
+        // Izračunaj udaljenost do prve i zadnje stanice
+        var distPrva = distance(lat, lng, okr.prvaLat, okr.prvaLng);
+        var distZadnja = distance(lat, lng, okr.zadnjaLat, okr.zadnjaLng);
+        
+        if (distPrva < 200) {
+            return okr.prva;
+        } else if (distZadnja < 200) {
+            return okr.zadnja;
         }
-        return closest;
+        
+        // Ako je negdje između, vrati zadnji zapamćeni ili prvu stanicu
+        return busStatus[gbr]?.lastDirection || okr.prva;
     }
 
     // ============================================================
@@ -489,7 +495,7 @@
         if (!gbr || !line) return;
 
         var v = vehicleData[gbr] || {};
-        var dir = getDirection(gbr, m.getLatLng().lat, m.getLatLng().lng);
+        var dir = getDirection(gbr, line, m.getLatLng().lat, m.getLatLng().lng);
         var dirName = dir ? dir.replace(/_/g, ' ') : 'Nepoznat';
 
         var html = `<div style="font-family:Arial,sans-serif;min-width:200px;padding:4px 0;">
@@ -518,6 +524,7 @@
             .then(r => r.json())
             .then(stops => {
                 allStops = stops;
+                pronadjiOkretistaZaLinije();
                 console.log('Učitano stanica:', stops.length);
             })
             .catch(e => console.error('Greška:', e));
@@ -573,7 +580,7 @@
     }
 
     // ============================================================
-    // 9. DOHVATI LIVE AUTOBUSE - SA PRAĆENJEM SMJERA
+    // 9. DOHVATI LIVE AUTOBUSE
     // ============================================================
     async function fetchLiveBuses() {
         try {
@@ -592,30 +599,11 @@
                 lastSeen[gbr] = formatTime(now);
                 try { localStorage.setItem('busLastSeen', JSON.stringify(lastSeen)); } catch(e) {}
 
-                if (!busStatus[gbr]) {
-                    busStatus[gbr] = { lastOkretiste: null, wasOnOkretiste: false };
-                }
-
-                // Provjeri je li na okretištu (smanjeni radius 80m)
-                var isOnOkretiste = false;
-                var currentOkretiste = null;
-                for (var key in okretista) {
-                    var okr = okretista[key];
-                    var d = distance(lat, lng, okr.lat, okr.lng);
-                    if (d < okr.radius) {
-                        isOnOkretiste = true;
-                        currentOkretiste = key;
-                        break;
-                    }
-                }
-
-                if (isOnOkretiste) {
-                    // Na okretištu je - zapamti
-                    busStatus[gbr].lastOkretiste = currentOkretiste;
-                    busStatus[gbr].wasOnOkretiste = true;
-                } else {
-                    // Nije na okretištu - ako je prije bio, ostaje zadnji smjer
-                    // Ako nikad nije bio, nećemo ništa mijenjati
+                // Ažuriraj smjer za ovaj autobus
+                var dir = getDirection(gbr, line, lat, lng);
+                if (dir && dir !== 'Nepoznat') {
+                    if (!busStatus[gbr]) busStatus[gbr] = {};
+                    busStatus[gbr].lastDirection = dir;
                 }
 
                 var icon = createIcon(line, gbr);
