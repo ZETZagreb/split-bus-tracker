@@ -386,67 +386,52 @@
     var allStops = [];
     var stopMarkers = [];
     var stopsVisible = false;
-    var okretista = {};
 
     // ============================================================
-    // 3. AUTOMATSKO PREPOZNAVANJE OKRETIŠTA IZ stops.json
+    // 3. OKRETIŠTA (RUČNO - SVA OKRETIŠTA)
     // ============================================================
-    function pronadjiOkretista() {
-        if (allStops.length === 0) {
-            console.log('Čekam da se stanice učitaju...');
-            return;
-        }
-        
-        var linije = {};
-        allStops.forEach(stop => {
-            if (!stop.routes) return;
-            stop.routes.forEach(route => {
-                var line = route.name;
-                if (!linije[line]) linije[line] = [];
-                var exists = linije[line].some(s => s.id === stop.id);
-                if (!exists) linije[line].push(stop);
-            });
-        });
-        
-        for (var line in linije) {
-            var stops = linije[line];
-            if (stops.length < 2) continue;
-            stops.sort((a,b) => a.id - b.id);
-            
-            var first = stops[0];
-            var last = stops[stops.length - 1];
-            
-            var firstKey = first.name.replace(/ /g, '_').toUpperCase();
-            if (!okretista[firstKey]) {
-                okretista[firstKey] = {
-                    lat: first.geography.coordinates[1],
-                    lng: first.geography.coordinates[0],
-                    radius: 120,
-                    linije: [line]
-                };
-            } else {
-                if (!okretista[firstKey].linije.includes(line)) {
-                    okretista[firstKey].linije.push(line);
-                }
-            }
-            
-            var lastKey = last.name.replace(/ /g, '_').toUpperCase();
-            if (!okretista[lastKey]) {
-                okretista[lastKey] = {
-                    lat: last.geography.coordinates[1],
-                    lng: last.geography.coordinates[0],
-                    radius: 120,
-                    linije: [line]
-                };
-            } else {
-                if (!okretista[lastKey].linije.includes(line)) {
-                    okretista[lastKey].linije.push(line);
-                }
-            }
-        }
-        
-        console.log('Pronađeno okretišta:', Object.keys(okretista).length);
-    }
+    var okretista = {
+        "SUKOISAN": { lat: 43.51561, lng: 16.44330, radius: 150 },
+        "AUTOBUSNI_TERMINAL_SUKOISAN": { lat: 43.51561, lng: 16.44330, radius: 150 },
+        "TROGIR": { lat: 43.51800, lng: 16.25100, radius: 150 },
+        "KOLODVOR_TROGIR": { lat: 43.51862, lng: 16.25137, radius: 150 },
+        "OMIS": { lat: 43.44000, lng: 16.68800, radius: 150 },
+        "OMIS_KOLODVOR": { lat: 43.44485, lng: 16.68682, radius: 150 },
+        "RAVNICKI_MOST": { lat: 43.42557, lng: 16.71155, radius: 150 },
+        "DUBRAVA": { lat: 43.64255, lng: 16.50088, radius: 150 },
+        "KLIS": { lat: 43.55900, lng: 16.52000, radius: 150 },
+        "KLIS_BRDO": { lat: 43.57534, lng: 16.53448, radius: 150 },
+        "SOLIN": { lat: 43.53800, lng: 16.49000, radius: 150 },
+        "KASTEL_STARI": { lat: 43.55268, lng: 16.34280, radius: 150 },
+        "KASTEL_NOVI": { lat: 43.55175, lng: 16.33884, radius: 150 },
+        "STOBREC": { lat: 43.50300, lng: 16.52200, radius: 150 },
+        "ZRNOVNICA": { lat: 43.51747, lng: 16.55546, radius: 150 },
+        "SITNO_GORNJE": { lat: 43.51692, lng: 16.61048, radius: 150 },
+        "SITNO_DONJE": { lat: 43.50690, lng: 16.59601, radius: 150 },
+        "DUGOPOLJE": { lat: 43.58234, lng: 16.59602, radius: 150 },
+        "HNK": { lat: 43.51083, lng: 16.43848, radius: 150 },
+        "POJISAN": { lat: 43.50490, lng: 16.44989, radius: 150 },
+        "BOLNICA_FIRULE": { lat: 43.50522, lng: 16.45688, radius: 150 },
+        "BOLNICA_KRIZINE": { lat: 43.50663, lng: 16.46556, radius: 150 },
+        "MERTOJAK": { lat: 43.50804, lng: 16.47648, radius: 150 },
+        "ZNJAN": { lat: 43.50705, lng: 16.48334, radius: 150 },
+        "TRSTENIK": { lat: 43.50541, lng: 16.47104, radius: 150 },
+        "DUILOVO": { lat: 43.50438, lng: 16.49520, radius: 150 },
+        "KAMEN": { lat: 43.54230, lng: 16.50500, radius: 150 },
+        "PRUGOVO": { lat: 43.62648, lng: 16.48692, radius: 150 },
+        "NEORIC": { lat: 43.68399, lng: 16.51941, radius: 150 },
+        "MUC": { lat: 43.68874, lng: 16.49437, radius: 150 },
+        "BISKO": { lat: 43.57605, lng: 16.68880, radius: 150 },
+        "DOLAC": { lat: 43.51949, lng: 16.69750, radius: 150 },
+        "GATA": { lat: 43.46365, lng: 16.71191, radius: 150 },
+        "OSTRVICA": { lat: 43.45724, lng: 16.75195, radius: 150 },
+        "PODGRADE": { lat: 43.45339, lng: 16.80104, radius: 150 },
+        "OMIS_MUL": { lat: 43.44207, lng: 16.69491, radius: 150 },
+        "KREŠEVO": { lat: 43.47340, lng: 16.87183, radius: 150 },
+        "BLATO_NA_CETINI": { lat: 43.47915, lng: 16.84550, radius: 150 },
+        "KATUNI": { lat: 43.46130, lng: 16.90019, radius: 150 },
+        "KONJSKO": { lat: 43.59381, lng: 16.51604, radius: 150 }
+    };
 
     // ============================================================
     // 4. POMOĆNE FUNKCIJE
@@ -523,7 +508,6 @@
             .then(r => r.json())
             .then(stops => {
                 allStops = stops;
-                pronadjiOkretista();
                 console.log('Učitano stanica:', stops.length);
             })
             .catch(e => console.error('Greška:', e));
