@@ -534,7 +534,7 @@
     }
 
     // ============================================================
-    // POPUP NA KLIK - POPRAVLJEN (ne gasi se)
+    // POPUP NA KLIK
     // ============================================================
     function openBusPopup(e) {
         var marker = e.target;
@@ -619,36 +619,25 @@
     }
 
     // ============================================================
-    // POPIS SVIH VOZILA
+    // POPIS SVIH VOZILA - ČISTA VERZIJA (bez broja polazaka)
     // ============================================================
     function renderFullList() {
         var list = document.getElementById('historyList');
-        var today = new Date().toLocaleDateString('hr-HR');
         
         var html = '';
 
         allGbrList.forEach(gbr => {
             var time = lastSeen[gbr] || 'Nema podataka';
             var marker = markers[gbr];
-            var line = marker ? (marker.busData?.name || '?') : '?';
-            
-            var todayDepartures = 0;
-            if (departureLog[gbr]) {
-                departureLog[gbr].forEach(log => {
-                    if (log.vrijeme && log.vrijeme.startsWith(today) && log.tip === 'POLAZAK') {
-                        todayDepartures++;
-                    }
-                });
-            }
+            var line = marker ? (marker.busData?.name || '') : '';
             
             var statusClass = (time !== 'Nema podataka') ? '' : 'nodata';
-            var depInfo = todayDepartures > 0 ? ` (${todayDepartures} pol.)` : '';
-            var lineDisplay = (line !== '?') ? line : '-';
+            var lineDisplay = line || '-';
             
             html += `<div class="history-item">
                 <span class="gbr">${gbr}</span>
                 <span class="line">${lineDisplay}</span>
-                <span class="time">${time}${depInfo}</span>
+                <span class="time">${time}</span>
                 <span class="status ${statusClass}">${(time !== 'Nema podataka') ? '✅' : '❌'}</span>
             </div>`;
         });
@@ -665,7 +654,7 @@
     }
 
     // ============================================================
-    // LIVE AUTOBUSI - POPRAVLJENI (klik radi uvijek)
+    // LIVE AUTOBUSI
     // ============================================================
     async function fetchLiveBuses() {
         try {
