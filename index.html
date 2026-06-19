@@ -12,10 +12,11 @@
         body { margin: 0; padding: 0; background: #111; }
         #map { height: 100vh; width: 100%; }
 
+        /* TRAŽILICA */
         .search-container {
             position: absolute; top: 16px; left: 16px; z-index: 1000;
             background: white; border-radius: 60px; box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-            display: flex; align-items: center; backdrop-filter: blur(10px);
+            display: flex; align-items: center;
             background: rgba(255,255,255,0.98); border: 1px solid rgba(0,0,0,0.08);
             padding-right: 6px; max-width: 340px;
         }
@@ -38,6 +39,7 @@
         .autocomplete-gbr { font-weight: 700; color: #ff6600; background: #fff0e6; padding: 4px 12px; border-radius: 40px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
         .autocomplete-line { color: #666; font-size: 12px; margin-left: 8px; }
 
+        /* GUMB PRIKAŽI STANICE */
         .control-panel {
             position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
             z-index: 1000; background: #1a1a2e; border-radius: 60px;
@@ -46,6 +48,7 @@
         .control-panel button { padding: 12px 28px; background: #ff6600; color: white; border: none; cursor: pointer; font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 10px; letter-spacing: 0.3px; }
         .control-panel button:active { background: #ff5500; transform: scale(0.97); }
 
+        /* STATS */
         .stats {
             position: absolute; bottom: 20px; right: 16px; z-index: 1000;
             background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); color: white;
@@ -54,6 +57,7 @@
         }
         .stats i { font-size: 10px; opacity: 0.8; }
 
+        /* IKONE */
         .bus-label {
             width: 56px; height: 42px; border: 2.5px solid #1a1a2e; border-radius: 10px;
             overflow: hidden; font-family: 'Inter', sans-serif;
@@ -82,6 +86,7 @@
             font-weight: 800; font-size: 12px; text-align: center;
         }
 
+        /* POPUP - TRAJNI */
         .custom-popup {
             font-family: 'Inter', sans-serif; min-width: 220px; padding: 4px 0;
         }
@@ -91,13 +96,13 @@
         .custom-popup .label { color: #666; font-weight: 500; }
         .custom-popup .value { color: #1a1a2e; font-weight: 600; }
 
-        /* ====== LISTA SVIH VOZILA (DESNI PANEL) ====== */
+        /* ====== PANEL SA SVIM AUTOBUSIMA ====== */
         .history-panel {
             position: absolute; top: 80px; right: 16px; z-index: 1000;
             background: rgba(255,255,255,0.97); backdrop-filter: blur(10px);
             border-radius: 20px; box-shadow: 0 4px 25px rgba(0,0,0,0.25);
             padding: 16px 18px; max-height: calc(100vh - 180px); overflow-y: auto;
-            min-width: 220px; max-width: 280px; border: 1px solid rgba(0,0,0,0.08);
+            min-width: 260px; max-width: 320px; border: 1px solid rgba(0,0,0,0.08);
             display: none;
         }
         .history-panel.visible { display: block; }
@@ -111,8 +116,8 @@
         .history-panel .close-btn { margin-left: auto; cursor: pointer; color: #999; font-size: 14px; }
         .history-panel .close-btn:hover { color: #ff6600; }
         .history-item {
-            padding: 6px 0; border-bottom: 1px solid #f0f0f0;
-            font-size: 12px; display: flex; align-items: center; gap: 6px;
+            padding: 5px 0; border-bottom: 1px solid #f0f0f0;
+            font-size: 11px; display: flex; align-items: center; gap: 6px;
         }
         .history-item:last-child { border-bottom: none; }
         .history-item .gbr {
@@ -121,6 +126,10 @@
         }
         .history-item .line { font-size: 11px; color: #1a1a2e; font-weight: 500; min-width: 25px; }
         .history-item .time { color: #666; font-size: 10px; margin-left: auto; white-space: nowrap; }
+        .history-item .status {
+            font-size: 9px; padding: 1px 6px; border-radius: 20px; background: #e8f5e9; color: #2e7d32;
+        }
+        .history-item .status.nodata { background: #f5f5f5; color: #999; }
         .history-empty { color: #999; font-size: 12px; font-style: italic; text-align: center; padding: 20px 0; }
 
         .history-panel::-webkit-scrollbar { width: 4px; }
@@ -175,20 +184,27 @@
     </button>
 </div>
 
+<!-- GUMB ZA OTVARANJE POPISA SVIH AUTOBUSA -->
+<div style="position:absolute; top:80px; right:80px; z-index:1000;">
+    <button onclick="toggleHistory()" style="background:#ff6600; color:white; border:none; border-radius:50px; padding:10px 16px; font-size:13px; font-weight:600; cursor:pointer; box-shadow:0 4px 15px rgba(0,0,0,0.3); display:flex; align-items:center; gap:8px;">
+        <i class="fas fa-list"></i> Popis vozila
+    </button>
+</div>
+
 <!-- STATS -->
 <div class="stats">
     <i class="fas fa-clock"></i>
     <span id="statsText">Učitavanje...</span>
 </div>
 
-<!-- ====== LISTA SVIH VOZILA (klik na ikonu povijesti ili dvostruki klik na mapu) ====== -->
+<!-- ====== PANEL SA POPISOM SVIH AUTOBUSA ====== -->
 <div id="historyPanel" class="history-panel">
     <h4>
-        <i class="fas fa-history"></i> Zadnji put viđeni
+        <i class="fas fa-bus"></i> Sva vozila
         <span class="close-btn" onclick="toggleHistory()"><i class="fas fa-times"></i></span>
     </h4>
     <div id="historyList">
-        <div class="history-empty">Još nema podataka...</div>
+        <div class="history-empty">Učitavanje...</div>
     </div>
 </div>
 
@@ -198,7 +214,32 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     // ============================================================
-    // 1. TABLICA VOZILA
+    // 1. TABLICA VOZILA (SVI GBR-OVI - za popis)
+    // ============================================================
+    var allGbrList = [
+        "001","002","003","004","005","006","007","008","009","010",
+        "011","012","013","014","015","016","017","018","019","020",
+        "021","022","023","024","025","026","027","028","029","030",
+        "031","032","033","034","035","036","037","038","039","040",
+        "041","042","043","044","045","046","047","048","049","050",
+        "051","052","053","054","055","056","057","058","059","060",
+        "061","062","063","064","065","066","067","068","069","070",
+        "071","072","073","074","075","076","077","078","079","080",
+        "081","082","083","084","085","086","087","088","089","090",
+        "091","092","093","094","095","096","097","098","099","100",
+        "101","102","103","104","105","106","107","108","109","110",
+        "111","112","113","114","115","116","117","118","119","120",
+        "121","122","123","124","125","126",
+        "246","248","249","250","251","252","253","254",
+        "263","264","265","266","267","268","269","270","271","272","273","274","275",
+        "276","277","279",
+        "285","286","287","288","289","290","291","292","293","294","295",
+        "296","297","298","299","300","301",
+        "307","308","309","310","311","312","313","314","315","316","317","318"
+    ];
+
+    // ============================================================
+    // 2. PODACI O VOZILIMA (model + registracija)
     // ============================================================
     var vehicleData = {
         "001": { model: "MAN Lion's City (NL 323)", reg: "ST-2685-P" },
@@ -383,7 +424,7 @@
     };
 
     // ============================================================
-    // 2. OKRETIŠTA (za praćenje polazaka)
+    // 3. OKRETIŠTA
     // ============================================================
     var okretista = {
         "SUKOISAN": { lat: 43.51561, lng: 16.44330, radius: 120 },
@@ -393,7 +434,7 @@
     };
 
     // ============================================================
-    // 3. APLIKACIJA
+    // 4. APLIKACIJA
     // ============================================================
     var map = L.map('map').setView([43.51, 16.44], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -404,12 +445,13 @@
     var allStops = [];
     var stopMarkers = [];
     var stopsVisible = false;
-    var lastSeen = {};          // zadnji put viđen - trajno
-    var departureLog = {};      // polasci - trajno
-    var busStatus = {};         // trenutni status: 'parking' ili 'driving'
+    var lastSeen = {};
+    var departureLog = {};
+    var busStatus = {};
+    var filterActive = false;
 
     // ============================================================
-    // 4. IZRAČUN UDALJENOSTI
+    // 5. POMOĆNE FUNKCIJE
     // ============================================================
     function distance(lat1, lon1, lat2, lon2) {
         var R = 6371000;
@@ -418,12 +460,15 @@
         var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                 Math.sin(dLon/2) * Math.sin(dLon/2);
-        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function formatTime(date) {
+        return date.toLocaleDateString('hr-HR') + ' ' + date.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' });
     }
 
     // ============================================================
-    // 5. IKONE
+    // 6. IKONE
     // ============================================================
     function createBusIcon(lineName, garageNumber) {
         var isSpecial = ['307', '308', 307, 308].includes(String(garageNumber).trim());
@@ -434,12 +479,12 @@
     }
 
     // ============================================================
-    // 6. STANICE
+    // 7. STANICE
     // ============================================================
     function loadStops() {
         fetch('stops.json')
             .then(r => r.json())
-            .then(stops => { allStops = stops; console.log('Stanica:', stops.length); })
+            .then(stops => { allStops = stops; })
             .catch(e => console.error(e));
     }
 
@@ -472,71 +517,50 @@
     }
 
     // ============================================================
-    // 7. DETALJI VOZILA NA KLIK (TRAJNI POPUP)
+    // 8. KLIK NA AUTOBUS - TRAJNI POPUP
     // ============================================================
-    function fetchBusDetails(garageNumber, marker, bus) {
-        var url = `https://www.bus-split.com/api/vehicles/details?id=${garageNumber}&t=${Date.now()}`;
-        fetch(url)
-            .then(r => r.json())
-            .then(data => {
-                var vehicle = vehicleData[String(garageNumber)] || {};
-                var html = `<div class="custom-popup">
-                    <div class="title">🚌 Linija ${data.name || bus.name}</div>
-                    <div class="row"><span class="label">Garažni broj:</span><span class="value">${garageNumber}</span></div>
-                    <div class="row"><span class="label">Registarska oznaka:</span><span class="value">${vehicle.reg || data.registrationNumber || 'Nepoznato'}</span></div>
-                    <div class="row"><span class="label">Model:</span><span class="value">${vehicle.model || data.brand || 'Nepoznato'}</span></div>
-                    <div class="row"><span class="label">Zadnji put viđen:</span><span class="value">${lastSeen[garageNumber] || 'Nepoznato'}</span></div>
-                </div>`;
-                marker.bindPopup(html).openPopup();
-            })
-            .catch(() => {
-                var vehicle = vehicleData[String(garageNumber)] || {};
-                var html = `<div class="custom-popup">
-                    <div class="title">🚌 Linija ${bus.name}</div>
-                    <div class="row"><span class="label">Garažni broj:</span><span class="value">${garageNumber}</span></div>
-                    <div class="row"><span class="label">Registarska oznaka:</span><span class="value">${vehicle.reg || 'Nepoznato'}</span></div>
-                    <div class="row"><span class="label">Model:</span><span class="value">${vehicle.model || 'Nepoznato'}</span></div>
-                    <div class="row"><span class="label">Zadnji put viđen:</span><span class="value">${lastSeen[garageNumber] || 'Nepoznato'}</span></div>
-                </div>`;
-                marker.bindPopup(html).openPopup();
-            });
+    function openBusPopup(gbr, line, marker) {
+        var vehicle = vehicleData[String(gbr)] || {};
+        var time = lastSeen[gbr] || 'Nema podataka';
+        
+        var html = `<div class="custom-popup">
+            <div class="title">🚌 Linija ${line}</div>
+            <div class="row"><span class="label">Garažni broj:</span><span class="value">${gbr}</span></div>
+            <div class="row"><span class="label">Registarska oznaka:</span><span class="value">${vehicle.reg || 'Nepoznato'}</span></div>
+            <div class="row"><span class="label">Model:</span><span class="value">${vehicle.model || 'Nepoznato'}</span></div>
+            <div class="row"><span class="label">Zadnji put viđen:</span><span class="value">${time}</span></div>
+        </div>`;
+        
+        marker.bindPopup(html).openPopup();
     }
 
     // ============================================================
-    // 8. PRAĆENJE POLAZAKA S OKRETIŠTA
+    // 9. PRAĆENJE POLAZAKA
     // ============================================================
     function checkDeparture(gbr, line, lat, lng) {
         var now = new Date();
-        var timeStr = now.toLocaleDateString('hr-HR') + ' ' + now.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' });
+        var timeStr = formatTime(now);
 
-        // Ažuriraj zadnji put viđen
+        // Ažuriraj zadnje viđenje
         lastSeen[gbr] = timeStr;
         saveHistory();
 
-        // Inicijaliziraj status ako ne postoji
         if (!busStatus[gbr]) {
             busStatus[gbr] = { status: 'unknown', lastOkretiste: null };
         }
 
-        // Provjeri sva okretišta
+        // Provjeri okretišta
         for (var key in okretista) {
             var okr = okretista[key];
             var dist = distance(lat, lng, okr.lat, okr.lng);
             
             if (dist < okr.radius) {
-                // Autobus je NA okretištu
+                // NA OKRETIŠTU
                 if (busStatus[gbr].status === 'driving' && busStatus[gbr].lastOkretiste === key) {
-                    // UPRAVO JE DOŠAO NA OKRETIŠTE (završio vožnju)
-                    var logEntry = {
-                        tip: 'DOLAZAK',
-                        okretiste: key,
-                        vrijeme: timeStr,
-                        linija: line
-                    };
+                    // DOŠAO NA OKRETIŠTE
                     if (!departureLog[gbr]) departureLog[gbr] = [];
-                    departureLog[gbr].push(logEntry);
+                    departureLog[gbr].push({ tip: 'DOLAZAK', okretiste: key, vrijeme: timeStr, linija: line });
                     saveDepartures();
-                    renderHistory();
                 }
                 busStatus[gbr].status = 'parking';
                 busStatus[gbr].lastOkretiste = key;
@@ -544,18 +568,12 @@
             }
         }
 
-        // Ako nismo na okretištu, a prije smo bili na okretištu -> KRENUO JE
+        // NIJE NA OKRETIŠTU - provjeri jel krenuo
         if (busStatus[gbr].status === 'parking' && busStatus[gbr].lastOkretiste) {
-            var logEntry = {
-                tip: 'POLAZAK',
-                okretiste: busStatus[gbr].lastOkretiste,
-                vrijeme: timeStr,
-                linija: line
-            };
+            // KRENUO S OKRETIŠTA
             if (!departureLog[gbr]) departureLog[gbr] = [];
-            departureLog[gbr].push(logEntry);
+            departureLog[gbr].push({ tip: 'POLAZAK', okretiste: busStatus[gbr].lastOkretiste, vrijeme: timeStr, linija: line });
             saveDepartures();
-            renderHistory();
             busStatus[gbr].status = 'driving';
         } else {
             busStatus[gbr].status = 'driving';
@@ -563,7 +581,7 @@
     }
 
     // ============================================================
-    // 9. SPREMANJE / ČITANJE (localStorage)
+    // 10. SPREMANJE
     // ============================================================
     function saveHistory() {
         try { localStorage.setItem('busLastSeen', JSON.stringify(lastSeen)); } catch(e) {}
@@ -579,45 +597,21 @@
     }
 
     // ============================================================
-    // 10. PRIKAZ LISTE SVIH VOZILA (DESNI PANEL)
+    // 11. POPIS SVIH AUTOBUSA - GLAVNA LISTA
     // ============================================================
-    function renderHistory() {
+    function renderFullList() {
         var list = document.getElementById('historyList');
+        var today = new Date().toLocaleDateString('hr-HR');
         
-        // Napravi mapu svih GBR-ova iz lastSeen i departureLog
-        var allGbrs = {};
-        for (var gbr in lastSeen) {
-            allGbrs[gbr] = { lastSeen: lastSeen[gbr] };
-        }
-        // Dodaj one koji su samo u departureLog (ako ih nema u lastSeen)
-        for (var gbr in departureLog) {
-            if (!allGbrs[gbr]) {
-                allGbrs[gbr] = { lastSeen: 'Nepoznato' };
-            }
-        }
-
-        var entries = Object.keys(allGbrs);
-        if (entries.length === 0) {
-            list.innerHTML = '<div class="history-empty">Još nema podataka...</div>';
-            return;
-        }
-
-        // Sortiraj po zadnjem viđenju (najnoviji na vrhu)
-        entries.sort((a,b) => {
-            var ta = allGbrs[a].lastSeen || '0';
-            var tb = allGbrs[b].lastSeen || '0';
-            return tb.localeCompare(ta);
-        });
-
         var html = '';
-        entries.slice(0, 50).forEach(gbr => {
-            var time = allGbrs[gbr].lastSeen || '?';
-            // Pronađi liniju iz markera
+        var hasData = false;
+
+        allGbrList.forEach(gbr => {
+            var time = lastSeen[gbr] || 'Nema podataka';
             var marker = markers[gbr];
             var line = marker ? (marker.busData?.name || '?') : '?';
             
             // Broj polazaka danas
-            var today = new Date().toLocaleDateString('hr-HR');
             var todayDepartures = 0;
             if (departureLog[gbr]) {
                 departureLog[gbr].forEach(log => {
@@ -627,49 +621,40 @@
                 });
             }
             
-            var depInfo = todayDepartures > 0 ? ` (${todayDepartures} polazaka danas)` : '';
+            var statusClass = (time !== 'Nema podataka') ? '' : 'nodata';
+            var depInfo = todayDepartures > 0 ? ` (${todayDepartures} pol.)` : '';
+            var lineDisplay = (line !== '?') ? line : '-';
             
             html += `<div class="history-item">
                 <span class="gbr">${gbr}</span>
-                <span class="line">${line}</span>
+                <span class="line">${lineDisplay}</span>
                 <span class="time">${time}${depInfo}</span>
+                <span class="status ${statusClass}">${(time !== 'Nema podataka') ? '✅' : '❌'}</span>
             </div>`;
+            
+            if (time !== 'Nema podataka') hasData = true;
         });
+
+        if (!hasData) {
+            html = '<div class="history-empty">Još nema podataka. Pričekajte da se autobusi pojave na karti.</div>';
+        }
+
         list.innerHTML = html;
     }
 
+    // ============================================================
+    // 12. OT VARANJE/ZATVARANJE PANELA
+    // ============================================================
     function toggleHistory() {
         var panel = document.getElementById('historyPanel');
         panel.classList.toggle('visible');
         if (panel.classList.contains('visible')) {
-            renderHistory();
-            // Dodaj gumb za brisanje povijesti
-            var existingBtn = document.getElementById('clearHistoryBtn');
-            if (!existingBtn) {
-                var btn = document.createElement('button');
-                btn.id = 'clearHistoryBtn';
-                btn.innerHTML = '<i class="fas fa-trash"></i> Obriši povijest';
-                btn.style.cssText = 'background:#ff4444;color:white;border:none;padding:6px 12px;border-radius:30px;font-size:11px;cursor:pointer;margin-top:8px;width:100%;';
-                btn.onclick = function() {
-                    if (confirm('Obrisati svu pohranjenu povijest?')) {
-                        lastSeen = {};
-                        departureLog = {};
-                        busStatus = {};
-                        localStorage.removeItem('busLastSeen');
-                        localStorage.removeItem('busDepartures');
-                        renderHistory();
-                    }
-                };
-                document.getElementById('historyList').parentNode.appendChild(btn);
-            }
-        } else {
-            var btn = document.getElementById('clearHistoryBtn');
-            if (btn) btn.remove();
+            renderFullList();
         }
     }
 
     // ============================================================
-    // 11. LIVE AUTOBUSI
+    // 13. LIVE AUTOBUSI
     // ============================================================
     async function fetchLiveBuses() {
         try {
@@ -684,7 +669,6 @@
                 var lat = bus.latitude;
                 var lng = bus.longitude;
 
-                // Provjeri polazak s okretišta
                 checkDeparture(gbr, line, lat, lng);
 
                 var icon = createBusIcon(line, gbr);
@@ -695,18 +679,23 @@
                 } else {
                     var marker = L.marker([lat, lng], { icon: icon }).addTo(map);
                     marker.busData = { name: line, garageNumber: gbr };
-                    marker.on('click', () => fetchBusDetails(gbr, marker, marker.busData));
+                    marker.on('click', function(m, g, l) {
+                        return function() { openBusPopup(g, l, m); };
+                    }(marker, gbr, line));
                     markers[gbr] = marker;
                 }
+                
+                // Popup za prikaz (ne gasi se)
                 markers[gbr].bindPopup(`
-                    <div style="font-family: 'Inter', sans-serif;">
+                    <div style="font-family: 'Inter', sans-serif; min-width: 150px;">
                         <b style="color:#ff6600;">🚌 Linija ${line}</b><br>
                         <b>🔢 Garažni broj:</b> ${gbr}<br>
-                        <i>Kliknite za više detalja...</i>
+                        <i style="font-size:11px;color:#666;">Kliknite za detalje</i>
                     </div>
                 `);
             });
 
+            // Ukloni stare
             for (var gbr in markers) {
                 if (!currentGbrs.includes(String(gbr))) {
                     map.removeLayer(markers[gbr]);
@@ -714,43 +703,58 @@
                 }
             }
 
+            // Ažuriraj broj
             var count = Object.keys(markers).length;
             document.getElementById('statsText').innerHTML = `${new Date().toLocaleTimeString('hr-HR')} | ${count}`;
             document.getElementById('busCount').innerHTML = `${count}`;
-            
+
             // Osvježi listu ako je otvorena
             if (document.getElementById('historyPanel').classList.contains('visible')) {
-                renderHistory();
+                renderFullList();
             }
         } catch (e) {
             console.error(e);
-            document.getElementById('statsText').innerHTML = 'Greška';
         }
     }
 
     // ============================================================
-    // 12. PRETRAGA
+    // 14. PRETRAGA
     // ============================================================
     function filterBuses() {
-        var val = document.getElementById('busSearch').value.toLowerCase();
+        var val = document.getElementById('busSearch').value.toLowerCase().trim();
         var count = 0;
+        filterActive = false;
+        
         for (var gbr in markers) {
             var busData = markers[gbr].busData || {};
             var line = busData.name || '';
             if (line.toLowerCase().includes(val) || String(gbr).includes(val)) {
                 markers[gbr].setOpacity(1);
                 count++;
+                filterActive = true;
             } else {
-                markers[gbr].setOpacity(0.2);
+                markers[gbr].setOpacity(0.15);
             }
         }
         document.getElementById('busCount').innerHTML = `${count}`;
     }
 
+    function resetFilter() {
+        for (var gbr in markers) {
+            markers[gbr].setOpacity(1);
+        }
+        document.getElementById('busCount').innerHTML = `${Object.keys(markers).length}`;
+        filterActive = false;
+    }
+
     function showSuggestions() {
         var val = document.getElementById('busSearch').value.toLowerCase().trim();
         var div = document.getElementById('suggestionsList');
-        if (val.length < 1) { div.style.display = 'none'; return; }
+        if (val.length < 1) { 
+            div.style.display = 'none';
+            resetFilter();
+            return; 
+        }
 
         var suggestions = [];
         for (var gbr in markers) {
@@ -767,13 +771,16 @@
                 var d = document.createElement('div');
                 d.className = 'autocomplete-item';
                 d.innerHTML = `<span class="autocomplete-gbr"><i class="fas fa-bus"></i> ${item.gbr}</span><span class="autocomplete-line">Linija ${item.line}</span>`;
-                d.onclick = () => {
-                    document.getElementById('busSearch').value = item.gbr;
-                    div.style.display = 'none';
-                    map.setView(item.marker.getLatLng(), 16);
-                    item.marker.openPopup();
-                    filterBuses();
-                };
+                d.onclick = function(marker, gbr) {
+                    return function() {
+                        document.getElementById('busSearch').value = gbr;
+                        div.style.display = 'none';
+                        map.setView(marker.getLatLng(), 16);
+                        marker.openPopup();
+                        // FILTER SE PONIŠTAVA
+                        resetFilter();
+                    };
+                }(item.marker, item.gbr);
                 div.appendChild(d);
             });
             div.style.display = 'block';
@@ -783,18 +790,33 @@
     }
 
     // ============================================================
-    // 13. POKRENI
+    // 15. POKRENI
     // ============================================================
     document.getElementById('toggleStopsBtn').onclick = toggleStops;
+    
+    // Pretraga
     document.getElementById('busSearch').addEventListener('keyup', showSuggestions);
-    document.addEventListener('click', e => {
-        var c = document.querySelector('.autocomplete-container');
-        if (c && !c.contains(e.target)) {
+    document.getElementById('busSearch').addEventListener('blur', function() {
+        setTimeout(function() {
             document.getElementById('suggestionsList').style.display = 'none';
+            if (!filterActive) {
+                resetFilter();
+            }
+        }, 200);
+    });
+
+    // Klik van tražilice - poništi filter
+    document.addEventListener('click', function(e) {
+        var container = document.querySelector('.search-container');
+        if (container && !container.contains(e.target)) {
+            document.getElementById('suggestionsList').style.display = 'none';
+            if (!filterActive) {
+                resetFilter();
+            }
         }
     });
 
-    // Prečac za historiju: dvostruki klik na mapu ili dugi klik
+    // Dvostruki klik na mapu - otvori listu
     map.on('dblclick', toggleHistory);
 
     loadHistory();
@@ -802,11 +824,6 @@
     loadStops();
     fetchLiveBuses();
     setInterval(fetchLiveBuses, 7000);
-    setInterval(() => {
-        if (document.getElementById('historyPanel').classList.contains('visible')) {
-            renderHistory();
-        }
-    }, 10000);
 </script>
 </body>
 </html>
