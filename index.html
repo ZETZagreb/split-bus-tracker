@@ -186,7 +186,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     // ============================================================
-    // PODACI O VOZILIMA
+    // 1. PODACI O VOZILIMA
     // ============================================================
     var vehicleData = {
         "001": { model: "MAN Lion's City", reg: "ST-2685-P" },
@@ -373,7 +373,7 @@
     var allGbrs = Object.keys(vehicleData).sort((a,b) => Number(a) - Number(b));
 
     // ============================================================
-    // MAPA
+    // 2. MAPA
     // ============================================================
     var map = L.map('map').setView([43.51, 16.44], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -385,57 +385,92 @@
     var allStops = [];
     var stopMarkers = [];
     var stopsVisible = false;
-    var tripsCache = {};
 
     // ============================================================
-    // DOHVATI TRIPOVE
+    // 3. OKRETIŠTA (SAMO GLAVNA - DAJ MI TOČNE KOORDINATE)
     // ============================================================
-    async function fetchTrips() {
-        try {
-            var resp = await fetch(`https://www.bus-split.com/api/trips?count=50&t=${Date.now()}`);
-            var data = await resp.json();
-            tripsCache = {};
-            data.forEach(trip => {
-                var line = trip.name;
-                if (!tripsCache[line]) tripsCache[line] = [];
-                tripsCache[line].push(trip);
-            });
-            console.log('Učitano tripova:', data.length);
-            return tripsCache;
-        } catch(e) {
-            console.error(e);
-            return {};
-        }
+    var okretista = {
+        "SUKOISAN": { lat: 43.51561, lng: 16.44330 },
+        "TROGIR": { lat: 43.51800, lng: 16.25100 },
+        "RAVNICKI_MOST": { lat: 43.42557, lng: 16.71155 },
+        "OMIS": { lat: 43.44000, lng: 16.68800 },
+        "DUBRAVA": { lat: 43.64255, lng: 16.50088 },
+        "STOBREC": { lat: 43.50373, lng: 16.52587 },
+        "KLIS": { lat: 43.55900, lng: 16.52000 },
+        "SOLIN": { lat: 43.53800, lng: 16.49000 },
+        "KASTEL_STARI": { lat: 43.55268, lng: 16.34280 },
+        "SITNO_GORNJE": { lat: 43.51692, lng: 16.61048 },
+        "DUGOPOLJE": { lat: 43.58234, lng: 16.59602 },
+        "HNK": { lat: 43.51083, lng: 16.43848 },
+        "BRDA": { lat: 43.52165, lng: 16.47277 },
+        "ZRNOVNICA": { lat: 43.51747, lng: 16.55546 },
+        "KAMEN": { lat: 43.54230, lng: 16.50500 }
+    };
+
+    // ============================================================
+    // 4. POMOĆNE FUNKCIJE
+    // ============================================================
+    function formatTime(d) {
+        return d.toLocaleDateString('hr-HR') + ' ' + d.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' });
     }
 
-    // ============================================================
-    // DOHVAĆANJE SMJERA IZ TRIPOVA
-    // ============================================================
-    function getDirectionFromTrips(line) {
-        var trips = tripsCache[line];
-        if (!trips || trips.length === 0) return null;
+    function distance(lat1, lon1, lat2, lon2) {
+        var R = 6371000;
+        var dLat = (lat2 - lat1) * Math.PI / 180;
+        var dLon = (lon2 - lon1) * Math.PI / 180;
+        var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    function getDirection(line, lat, lng) {
+        // Za liniju 37 - Trogir ili Sukoisan
+        if (line === '37') {
+            var distTrogir = distance(lat, lng, 43.51800, 16.25100);
+            var distSuko = distance(lat, lng, 43.51561, 16.44330);
+            if (distTrogir < 200) return 'TROGIR';
+            if (distSuko < 200) return 'SUKOISAN';
+            return 'TROGIR → SUKOISAN';
+        }
         
-        var now = new Date();
-        var closestTrip = null;
-        var minDiff = Infinity;
+        // Za liniju 60 - Ravnicki Most ili Sukoisan ili Omis
+        if (line === '60') {
+            var distRav = distance(lat, lng, 43.42557, 16.71155);
+            var distSuko = distance(lat, lng, 43.51561, 16.44330);
+            var distOmis = distance(lat, lng, 43.44000, 16.68800);
+            if (distRav < 200) return 'RAVNIČKI MOST';
+            if (distSuko < 200) return 'SUKOISAN';
+            if (distOmis < 200) return 'OMIS';
+            return 'RAVNIČKI MOST → SUKOISAN';
+        }
         
-        trips.forEach(trip => {
-            var tripTime = new Date(trip.plannedArrivalTime || trip.expectedArrivalTime);
-            var diff = Math.abs(tripTime - now);
-            if (diff < minDiff) {
-                minDiff = diff;
-                closestTrip = trip;
+        // Za liniju 25 - Stobrec ili Matoševa
+        if (line === '25' || line === '27') {
+            var distStob = distance(lat, lng, 43.50373, 16.52587);
+            var distMato = distance(lat, lng, 43.51311, 16.43102);
+            if (distStob < 200) return 'STOBREČ';
+            if (distMato < 200) return 'MATOŠEVA';
+            return 'STOBREČ → MATOŠEVA';
+        }
+        
+        // Za ostale linije - nađi najbliže okretište
+        var closest = null;
+        var minDist = Infinity;
+        for (var key in okretista) {
+            var okr = okretista[key];
+            var d = distance(lat, lng, okr.lat, okr.lng);
+            if (d < minDist) {
+                minDist = d;
+                closest = key;
             }
-        });
-        
-        if (closestTrip && closestTrip.pathwayName) {
-            return closestTrip.pathwayName;
         }
-        return null;
+        return closest ? closest.replace(/_/g, ' ') : 'Nepoznat';
     }
 
     // ============================================================
-    // IKONE
+    // 5. IKONE - STARI IZGLED
     // ============================================================
     function createIcon(lineName, garageNumber) {
         var isSpecial = (garageNumber == '307' || garageNumber == '308');
@@ -451,7 +486,7 @@
     }
 
     // ============================================================
-    // KLIK NA AUTOBUS
+    // 6. KLIK NA AUTOBUS - SVI PODACI
     // ============================================================
     function onBusClick(e) {
         var m = e.target;
@@ -461,10 +496,8 @@
 
         var v = vehicleData[gbr] || {};
         var time = lastSeen[gbr] || 'Nepoznato';
-        
-        // Pokušaj dohvatiti smjer iz tripova
-        var dirName = getDirectionFromTrips(line);
-        if (!dirName) dirName = 'Nepoznat';
+        var dir = getDirection(line, m.getLatLng().lat, m.getLatLng().lng);
+        var dirName = dir ? dir.replace(/_/g, ' ') : 'Nepoznat';
 
         var html = `<div style="font-family:Arial,sans-serif;min-width:200px;padding:4px 0;">
             <div style="color:#ff6600;font-weight:700;font-size:16px;margin-bottom:6px;">🚌 Linija ${line}</div>
@@ -488,7 +521,7 @@
     }
 
     // ============================================================
-    // STANICE
+    // 7. STANICE
     // ============================================================
     function loadStops() {
         fetch('stops.json')
@@ -522,7 +555,7 @@
     }
 
     // ============================================================
-    // PANEL POPIS
+    // 8. PANEL POPIS
     // ============================================================
     function renderPanel() {
         var el = document.getElementById('panelList');
@@ -550,7 +583,7 @@
     }
 
     // ============================================================
-    // DOHVATI LIVE AUTOBUSE
+    // 9. DOHVATI LIVE AUTOBUSE
     // ============================================================
     async function fetchLiveBuses() {
         try {
@@ -559,10 +592,6 @@
             var vehicles = data.vehicles;
             var currentGbrs = vehicles.map(v => v.garageNumber);
 
-            if (Object.keys(tripsCache).length === 0) {
-                await fetchTrips();
-            }
-
             vehicles.forEach(bus => {
                 var gbr = bus.garageNumber;
                 var line = bus.name;
@@ -570,7 +599,7 @@
                 var lng = bus.longitude;
 
                 var now = new Date();
-                lastSeen[gbr] = now.toLocaleDateString('hr-HR') + ' ' + now.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' });
+                lastSeen[gbr] = formatTime(now);
                 try { localStorage.setItem('busLastSeen', JSON.stringify(lastSeen)); } catch(e) {}
 
                 var icon = createIcon(line, gbr);
@@ -605,7 +634,7 @@
     }
 
     // ============================================================
-    // PRETRAGA
+    // 10. PRETRAGA
     // ============================================================
     function searchBuses() {
         var val = document.getElementById('searchInput').value.toLowerCase().trim();
@@ -623,7 +652,7 @@
     }
 
     // ============================================================
-    // POKRENI
+    // 11. POKRENI
     // ============================================================
     document.getElementById('stopsBtn').onclick = toggleStops;
     document.getElementById('searchInput').addEventListener('input', searchBuses);
@@ -637,7 +666,6 @@
     map.on('dblclick', togglePanel);
 
     loadStops();
-    fetchTrips();
     fetchLiveBuses();
     setInterval(fetchLiveBuses, 7000);
 </script>
