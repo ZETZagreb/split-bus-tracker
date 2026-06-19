@@ -93,7 +93,7 @@
             font-weight: 800; font-size: 12px; text-align: center;
         }
 
-        /* POPUP - SVI PODACI */
+        /* POPUP - SVI PODACI, TRAJAN */
         .custom-popup {
             font-family: 'Inter', sans-serif; min-width: 250px; padding: 6px 0;
             max-width: 320px;
@@ -539,9 +539,9 @@
     }
 
     // ============================================================
-    // POPUP NA KLIK - SVI PODACI + SMJER
+    // KLIK NA AUTOBUS - OMAH SVI PODACI, BEZ "KLIKNI ZA VIŠE"
     // ============================================================
-    function openBusPopup(e) {
+    function onBusClick(e) {
         var marker = e.target;
         var gbr = marker.busData?.garageNumber;
         var line = marker.busData?.name;
@@ -706,17 +706,27 @@
                 } else {
                     var marker = L.marker([lat, lng], { icon: icon }).addTo(map);
                     marker.busData = { name: line, garageNumber: gbr };
-                    marker.on('click', openBusPopup);
+                    // DIREKTNO KLIK - OMAH POPUP
+                    marker.on('click', onBusClick);
                     markers[gbr] = marker;
                 }
                 
-                markers[gbr].bindPopup(`
-                    <div style="font-family: 'Inter', sans-serif; min-width: 150px; padding: 4px 0;">
-                        <b style="color:#ff6600; font-size:14px;">🚌 Linija ${line}</b><br>
-                        <b>🔢 Garažni broj:</b> ${gbr}<br>
-                        <i style="font-size:11px;color:#666;">Kliknite za detalje</i>
-                    </div>
-                `);
+                // NEMA "KLIKNI ZA VIŠE" - OMAH SVE
+                var vehicle = vehicleData[String(gbr)] || {};
+                var time = lastSeen[gbr] || 'Nema podataka';
+                var direction = getDirection(gbr, lat, lng);
+                var dirName = direction ? direction.replace('_', ' ') : 'Nepoznat';
+                
+                var html = `<div class="custom-popup">
+                    <div class="title">🚌 Linija ${line}</div>
+                    <div class="row"><span class="label">Garažni broj:</span><span class="value">${gbr}</span></div>
+                    <div class="row"><span class="label">Registarska oznaka:</span><span class="value">${vehicle.reg || 'Nepoznato'}</span></div>
+                    <div class="row"><span class="label">Model:</span><span class="value">${vehicle.model || 'Nepoznato'}</span></div>
+                    <div class="row"><span class="label">Zadnji put viđen:</span><span class="value">${time}</span></div>
+                    <div class="direction"><i class="fas fa-arrow-right"></i> Smjer: ${dirName}</div>
+                </div>`;
+                
+                markers[gbr].bindPopup(html);
             });
 
             for (var gbr in markers) {
