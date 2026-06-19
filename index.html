@@ -5,341 +5,239 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        * { font-family: 'Inter', system-ui, sans-serif; box-sizing: border-box; }
-        body { margin: 0; padding: 0; background: #f0f2f5; }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
         #map { height: 100vh; width: 100%; }
 
-        .search-container {
-            position: absolute; top: 16px; left: 16px; z-index: 1000;
-            background: white; border-radius: 50px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-            display: flex; align-items: center;
-            padding-right: 6px; max-width: 360px;
-            border: 1px solid rgba(255,255,255,0.3);
+        .search-box {
+            position: absolute; top: 12px; left: 12px; z-index: 1000;
+            background: white; border-radius: 30px; box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+            display: flex; align-items: center; padding: 4px 8px 4px 16px;
+            max-width: 340px; border: 1px solid rgba(0,0,0,0.08);
         }
-        .search-icon { padding: 10px 0 10px 16px; color: #ff6600; font-size: 15px; }
-        .autocomplete-container { position: relative; flex: 1; }
-        input { padding: 12px 12px 12px 0; width: 180px; border: none; font-size: 14px; font-weight: 500; background: transparent; outline: none; color: #1a1a2e; }
-        input::placeholder { color: #999; font-weight: 400; font-size: 13px; }
-        .bus-count-badge { background: #ff6600; color: white; padding: 6px 14px; border-radius: 50px; font-size: 13px; font-weight: 700; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
-        .bus-count-badge i { font-size: 12px; }
-        
-        .autocomplete-list {
-            position: absolute; top: calc(100% + 10px); left: 0; right: 0;
-            background: white; border-radius: 16px; max-height: 320px; overflow-y: auto;
-            z-index: 1001; box-shadow: 0 12px 30px rgba(0,0,0,0.2);
-            border: 1px solid rgba(0,0,0,0.06); min-width: 280px;
+        .search-box input {
+            border: none; padding: 10px 8px; font-size: 14px; width: 160px;
+            outline: none; background: transparent;
         }
-        .autocomplete-item { padding: 12px 18px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 14px; display: flex; align-items: center; gap: 12px; }
-        .autocomplete-item:active { background: #fff5ed; }
-        .autocomplete-item:last-child { border-bottom: none; }
-        .autocomplete-gbr { font-weight: 700; color: #ff6600; background: #fff0e6; padding: 4px 12px; border-radius: 30px; font-size: 13px; }
-        .autocomplete-line { color: #666; font-size: 12px; margin-left: 8px; }
+        .search-box .badge {
+            background: #ff6600; color: white; padding: 4px 12px;
+            border-radius: 30px; font-size: 13px; font-weight: 700;
+            white-space: nowrap;
+        }
 
-        .control-panel {
+        .btn-list {
+            position: absolute; top: 12px; right: 12px; z-index: 1000;
+            background: #1a1a2e; color: white; border: none;
+            border-radius: 30px; padding: 10px 18px; font-size: 13px;
+            font-weight: 600; cursor: pointer; box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+        }
+        .btn-list:hover { background: #ff6600; }
+
+        .btn-stops {
             position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; background: #1a1a2e; border-radius: 50px;
-            box-shadow: 0 6px 25px rgba(0,0,0,0.3); overflow: hidden;
+            z-index: 1000; background: #1a1a2e; border-radius: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3); overflow: hidden;
         }
-        .control-panel button { padding: 12px 28px; background: #ff6600; color: white; border: none; cursor: pointer; font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 10px; letter-spacing: 0.3px; }
-        .control-panel button:active { background: #ff5500; transform: scale(0.97); }
-
-        .list-btn {
-            position: absolute; top: 16px; right: 16px; z-index: 1000;
-            background: #1a1a2e; color: white; border: none; border-radius: 50px;
-            padding: 10px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.25);
-            display: flex; align-items: center; gap: 8px;
-            transition: all 0.2s;
+        .btn-stops button {
+            padding: 10px 24px; background: #ff6600; color: white;
+            border: none; cursor: pointer; font-weight: 700; font-size: 14px;
         }
-        .list-btn:hover { background: #ff6600; }
-        .list-btn:active { transform: scale(0.95); }
+        .btn-stops button:active { background: #ff5500; }
 
         .stats {
-            position: absolute; bottom: 28px; right: 16px; z-index: 1000;
-            background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); color: white;
-            padding: 6px 14px; border-radius: 50px; font-size: 11px; font-weight: 500;
-            display: flex; align-items: center; gap: 6px; pointer-events: none;
-        }
-        .stats i { font-size: 10px; opacity: 0.8; }
-
-        .bus-label {
-            width: 56px; height: 42px; border: 2.5px solid #1a1a2e; border-radius: 10px;
-            overflow: hidden; font-family: 'Inter', sans-serif;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex; flex-direction: column;
-            cursor: pointer; background: white; transition: transform 0.1s;
-        }
-        .bus-label:active { transform: scale(0.95); }
-        .bus-label-red {
-            width: 56px; height: 42px; border: 2.5px solid #ff2200; border-radius: 10px;
-            overflow: hidden; font-family: 'Inter', sans-serif;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.25); display: flex; flex-direction: column;
-            cursor: pointer; background: #ff2200;
-        }
-        .bus-label-red:active { transform: scale(0.95); }
-        .bus-top {
-            background: white; color: #ff6600; height: 21px; line-height: 21px;
-            font-weight: 800; font-size: 13px; text-align: center;
-        }
-        .bus-label-red .bus-top { background: #ff2200; color: white; font-size: 13px; }
-        .bus-bottom {
-            background: #ffcc00; color: #1a1a2e; height: 21px; line-height: 21px;
-            font-weight: 800; font-size: 12px; text-align: center;
-        }
-        .bus-bottom-red {
-            background: #cc0000; color: white; height: 21px; line-height: 21px;
-            font-weight: 800; font-size: 12px; text-align: center;
+            position: absolute; bottom: 28px; right: 12px; z-index: 1000;
+            background: rgba(0,0,0,0.7); color: white; padding: 6px 14px;
+            border-radius: 30px; font-size: 11px;
         }
 
-        /* POPUP - SVI PODACI, TRAJAN */
-        .custom-popup {
-            font-family: 'Inter', sans-serif; min-width: 250px; padding: 6px 0;
-            max-width: 320px;
+        .bus-icon {
+            background: #ffcc00; color: #1a1a2e; padding: 2px 4px;
+            border-radius: 4px; font-weight: 800; font-size: 11px;
+            border: 2px solid #1a1a2e; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            text-align: center; cursor: pointer; line-height: 1.3;
         }
-        .custom-popup .title { font-size: 17px; font-weight: 700; color: #ff6600; margin-bottom: 8px; }
-        .custom-popup .row { padding: 4px 0; font-size: 13px; display: flex; justify-content: space-between; border-bottom: 1px solid #f0f0f0; }
-        .custom-popup .row:last-child { border-bottom: none; }
-        .custom-popup .label { color: #666; font-weight: 500; }
-        .custom-popup .value { color: #1a1a2e; font-weight: 600; }
-        .custom-popup .direction { 
-            padding: 6px 10px; background: #e8f5e9; border-radius: 8px; 
-            color: #2e7d32; font-weight: 600; font-size: 12px; margin-top: 4px;
-            text-align: center;
+        .bus-icon-red {
+            background: #cc0000; color: white; padding: 2px 4px;
+            border-radius: 4px; font-weight: 800; font-size: 11px;
+            border: 2px solid #ff2200; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            text-align: center; cursor: pointer; line-height: 1.3;
         }
+        .bus-icon .num, .bus-icon-red .num { font-weight: 400; font-size: 9px; }
 
-        .history-panel {
-            position: absolute; top: 76px; right: 16px; z-index: 1000;
-            background: rgba(255,255,255,0.97); backdrop-filter: blur(10px);
-            border-radius: 20px; box-shadow: 0 4px 30px rgba(0,0,0,0.2);
-            padding: 16px 18px; max-height: calc(100vh - 160px); overflow-y: auto;
-            min-width: 270px; max-width: 340px; border: 1px solid rgba(0,0,0,0.06);
-            display: none;
+        .panel {
+            position: absolute; top: 70px; right: 12px; z-index: 1000;
+            background: rgba(255,255,255,0.97); border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0,0,0,0.2); padding: 14px 16px;
+            max-height: calc(100vh - 160px); overflow-y: auto;
+            min-width: 220px; max-width: 300px; display: none;
+            border: 1px solid rgba(0,0,0,0.06);
         }
-        .history-panel.visible { display: block; }
-        .history-panel h4 {
-            margin: 0 0 12px 0; font-size: 14px; color: #1a1a2e;
-            display: flex; align-items: center; gap: 8px; position: sticky; top: 0;
-            background: white; padding-bottom: 8px; border-bottom: 2px solid #ff6600;
-            z-index: 2;
+        .panel.visible { display: block; }
+        .panel h4 {
+            margin: 0 0 10px 0; font-size: 14px; color: #1a1a2e;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 2px solid #ff6600; padding-bottom: 8px;
         }
-        .history-panel h4 i { color: #ff6600; }
-        .history-panel .close-btn { margin-left: auto; cursor: pointer; color: #999; font-size: 16px; padding: 0 4px; }
-        .history-panel .close-btn:hover { color: #ff6600; }
-        .history-item {
-            padding: 5px 0; border-bottom: 1px solid #f0f0f0;
+        .panel .close { cursor: pointer; color: #999; font-size: 16px; }
+        .panel .close:hover { color: #ff6600; }
+        .panel-item {
+            padding: 4px 0; border-bottom: 1px solid #f0f0f0;
             font-size: 12px; display: flex; align-items: center; gap: 6px;
         }
-        .history-item:last-child { border-bottom: none; }
-        .history-item .gbr {
+        .panel-item:last-child { border-bottom: none; }
+        .panel-item .gbr {
             font-weight: 700; color: #ff6600; background: #fff0e6;
-            padding: 2px 8px; border-radius: 30px; font-size: 11px; min-width: 35px; text-align: center;
+            padding: 1px 8px; border-radius: 30px; font-size: 11px; min-width: 32px; text-align: center;
         }
-        .history-item .line { font-size: 11px; color: #1a1a2e; font-weight: 500; min-width: 25px; }
-        .history-item .time { color: #666; font-size: 10px; margin-left: auto; white-space: nowrap; }
-        .history-item .status { font-size: 9px; padding: 1px 6px; border-radius: 20px; background: #e8f5e9; color: #2e7d32; }
-        .history-item .status.nodata { background: #f5f5f5; color: #999; }
-        .history-empty { color: #999; font-size: 12px; font-style: italic; text-align: center; padding: 20px 0; }
+        .panel-item .line { font-size: 11px; color: #1a1a2e; font-weight: 500; min-width: 20px; }
+        .panel-item .time { color: #666; font-size: 10px; margin-left: auto; white-space: nowrap; }
+        .panel-item .ok { font-size: 9px; padding: 1px 6px; border-radius: 20px; background: #e8f5e9; color: #2e7d32; }
+        .panel-item .no { font-size: 9px; padding: 1px 6px; border-radius: 20px; background: #f5f5f5; color: #999; }
+        .panel-empty { color: #999; font-size: 12px; font-style: italic; text-align: center; padding: 20px 0; }
 
-        .history-panel::-webkit-scrollbar { width: 4px; }
-        .history-panel::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
-        .history-panel::-webkit-scrollbar-thumb { background: #ff6600; border-radius: 10px; }
-        .autocomplete-list::-webkit-scrollbar { width: 5px; }
-        .autocomplete-list::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
-        .autocomplete-list::-webkit-scrollbar-thumb { background: #ff6600; border-radius: 10px; }
+        .panel::-webkit-scrollbar { width: 4px; }
+        .panel::-webkit-scrollbar-thumb { background: #ff6600; border-radius: 10px; }
 
-        @media (max-width: 768px) {
-            .search-container { max-width: calc(100% - 140px); left: 12px; top: 12px; }
-            input { width: 100px; font-size: 13px; }
-            .bus-count-badge { padding: 4px 10px; font-size: 11px; }
-            .bus-count-badge i { display: none; }
-            .list-btn { top: 12px; right: 12px; padding: 8px 14px; font-size: 12px; }
-            .list-btn span { display: none; }
-            .control-panel button { padding: 10px 20px; font-size: 13px; }
-            .history-panel { right: 8px; left: 8px; max-width: none; top: 68px; max-height: calc(100vh - 130px); }
-            .bus-label, .bus-label-red { width: 48px; height: 38px; }
-            .bus-top, .bus-label-red .bus-top { height: 19px; line-height: 19px; font-size: 12px; }
-            .bus-bottom, .bus-bottom-red { height: 19px; line-height: 19px; font-size: 11px; }
-            .stats { font-size: 10px; padding: 4px 10px; bottom: 16px; right: 12px; }
-            .custom-popup { min-width: 180px; }
-            .custom-popup .title { font-size: 15px; }
-        }
-        @media (max-width: 480px) {
-            .search-container { max-width: calc(100% - 100px); }
-            input { width: 70px; font-size: 12px; }
-            .bus-count-badge span { font-size: 10px; }
-            .bus-label, .bus-label-red { width: 44px; height: 34px; }
-            .bus-top, .bus-label-red .bus-top { height: 17px; line-height: 17px; font-size: 11px; }
-            .bus-bottom, .bus-bottom-red { height: 17px; line-height: 17px; font-size: 10px; }
-            .history-item { font-size: 10px; }
-            .history-item .gbr { font-size: 9px; padding: 1px 6px; }
+        @media (max-width: 600px) {
+            .search-box { max-width: calc(100% - 100px); }
+            .search-box input { width: 80px; font-size: 12px; }
+            .btn-list { padding: 8px 12px; font-size: 12px; }
+            .btn-list span { display: none; }
+            .panel { right: 8px; left: 8px; max-width: none; top: 64px; }
         }
     </style>
 </head>
 <body>
 
-<div class="search-container">
-    <div class="search-icon"><i class="fas fa-search"></i></div>
-    <div class="autocomplete-container">
-        <input type="text" id="busSearch" placeholder="Gbr ili linija..." autocomplete="off">
-        <div id="suggestionsList" class="autocomplete-list" style="display: none;"></div>
-    </div>
-    <div class="bus-count-badge">
-        <i class="fas fa-bus"></i>
-        <span id="busCount">0</span>
-    </div>
+<!-- TRAŽILICA -->
+<div class="search-box">
+    <span style="color:#ff6600;font-size:14px;">🔍</span>
+    <input type="text" id="searchInput" placeholder="Gbr ili linija...">
+    <span class="badge" id="busCount">0</span>
 </div>
 
-<button class="list-btn" onclick="toggleHistory()">
-    <i class="fas fa-list"></i>
-    <span>Popis</span>
-</button>
+<!-- GUMB POPIS -->
+<button class="btn-list" onclick="togglePanel()">📋 <span>Popis</span></button>
 
-<div class="control-panel">
-    <button id="toggleStopsBtn">
-        <i class="fas fa-map-marker-alt"></i>
-        <span>Prikaži stanice</span>
-    </button>
+<!-- GUMB STANICE -->
+<div class="btn-stops">
+    <button id="stopsBtn">📍 Prikaži stanice</button>
 </div>
 
-<div class="stats">
-    <i class="fas fa-clock"></i>
-    <span id="statsText">Učitavanje...</span>
-</div>
+<!-- STATS -->
+<div class="stats" id="statsText">Učitavanje...</div>
 
-<div id="historyPanel" class="history-panel">
+<!-- PANEL POPIS -->
+<div class="panel" id="panel">
     <h4>
-        <i class="fas fa-bus"></i> Sva vozila
-        <span class="close-btn" onclick="toggleHistory()"><i class="fas fa-times"></i></span>
+        <span>🚌 Sva vozila</span>
+        <span class="close" onclick="togglePanel()">✕</span>
     </h4>
-    <div id="historyList">
-        <div class="history-empty">Učitavanje...</div>
-    </div>
+    <div id="panelList"><div class="panel-empty">Učitavanje...</div></div>
 </div>
 
+<!-- MAPA -->
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     // ============================================================
-    // PODACI
+    // 1. PODACI O VOZILIMA
     // ============================================================
-    var allGbrList = [
-        "001","002","003","004","005","006","007","008","009","010",
-        "011","012","013","014","015","016","017","018","019","020",
-        "021","022","023","024","025","026","027","028","029","030",
-        "031","032","033","034","035","036","037","038","039","040",
-        "041","042","043","044","045","046","047","048","049","050",
-        "051","052","053","054","055","056","057","058","059","060",
-        "061","062","063","064","065","066","067","068","069","070",
-        "071","072","073","074","075","076","077","078","079","080",
-        "081","082","083","084","085","086","087","088","089","090",
-        "091","092","093","094","095","096","097","098","099","100",
-        "101","102","103","104","105","106","107","108","109","110",
-        "111","112","113","114","115","116","117","118","119","120",
-        "121","122","123","124","125","126",
-        "246","248","249","250","251","252","253","254",
-        "263","264","265","266","267","268","269","270","271","272","273","274","275",
-        "276","277","279",
-        "285","286","287","288","289","290","291","292","293","294","295",
-        "296","297","298","299","300","301",
-        "307","308","309","310","311","312","313","314","315","316","317","318"
-    ];
-
     var vehicleData = {
-        "001": { model: "MAN Lion's City (NL 323)", reg: "ST-2685-P" },
-        "002": { model: "MAN Lion's City (NL 323)", reg: "ST-2686-P" },
-        "003": { model: "MAN Lion's City (NL 323)", reg: "ST-2687-P" },
-        "004": { model: "MAN Lion's City (NL 323)", reg: "ST-2684-P" },
-        "005": { model: "MAN Lion's City (NL 323)", reg: "ST-2677-P" },
-        "006": { model: "MAN Lion's City (NL 323)", reg: "ST-2671-P" },
-        "007": { model: "MAN Lion's City (NL 323)", reg: "ST-2675-P" },
-        "008": { model: "MAN Lion's City (NL 323)", reg: "ST-2672-P" },
-        "009": { model: "MAN Lion's City (NL 323)", reg: "ST-2679-P" },
-        "010": { model: "MAN Lion's City (NL 323)", reg: "ST-2654-P" },
-        "011": { model: "MAN Lion's City (NL 323)", reg: "ST-2674-P" },
-        "012": { model: "MAN Lion's City (NL 323)", reg: "ST-2678-P" },
-        "013": { model: "MAN Lion's City (NL 323)", reg: "ST-2683-P" },
-        "014": { model: "MAN Lion's City (NL 323)", reg: "ST-2673-P" },
-        "015": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-7852-P" },
-        "016": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-7853-P" },
-        "017": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-7854-P" },
-        "018": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-7856-P" },
-        "019": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-7857-P" },
-        "020": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-7858-P" },
-        "021": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-7859-P" },
-        "022": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-8247-P" },
-        "023": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-8246-P" },
-        "024": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-8249-P" },
-        "025": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-8248-P" },
-        "026": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-8193-P" },
-        "027": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-5619-P" },
-        "028": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-5618-P" },
-        "029": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-5614-P" },
-        "030": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-5613-P" },
-        "031": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-8106-P" },
-        "032": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-8107-P" },
-        "033": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-8124-P" },
-        "034": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-8125-P" },
-        "035": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-6921-T" },
-        "036": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-6919-T" },
-        "037": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-6912-T" },
-        "038": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-6915-T" },
-        "039": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-6914-T" },
-        "040": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-4591-AI" },
-        "041": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-6920-T" },
-        "042": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-6918-T" },
-        "043": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-6916-T" },
-        "044": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-6917-T" },
-        "045": { model: "Iveco Crossway LE City 12M", reg: "ST-6772-T" },
-        "046": { model: "Iveco Crossway LE City 12M", reg: "ST-6763-T" },
-        "047": { model: "Iveco Crossway LE City 12M", reg: "ST-6775-T" },
-        "048": { model: "Iveco Crossway LE City 12M", reg: "ST-6943-T" },
-        "049": { model: "Iveco Crossway LE City 12M", reg: "ST-6948-T" },
-        "050": { model: "Iveco Crossway LE City 12M", reg: "ST-6947-T" },
-        "051": { model: "Iveco Crossway LE City 12M", reg: "ST-6927-T" },
-        "052": { model: "Iveco Crossway LE City 12M", reg: "ST-6924-T" },
-        "053": { model: "MAN Lion's City 12C (NL 330)", reg: "ST-2619-AC" },
-        "054": { model: "MAN Lion's City 12C (NL 330)", reg: "ST-2617-AC" },
-        "055": { model: "MAN Lion's City 12C (NL 330)", reg: "ST-2615-AC" },
-        "056": { model: "MAN Lion's City 12C (NL 330)", reg: "ST-2645-AC" },
-        "057": { model: "MAN Lion's City 12C (NL 330)", reg: "ST-3740-AK" },
-        "058": { model: "MAN Lion's City 12C (NL 330)", reg: "ST-2629-AC" },
-        "059": { model: "MAN Lion's City 12C (NL 330)", reg: "ST-2649-AC" },
-        "060": { model: "MAN Lion's City 12C (NL 330)", reg: "ST-2648-AC" },
-        "061": { model: "Mercedes-Benz Intouro (III) E", reg: "ST-4837-AC" },
-        "062": { model: "Mercedes-Benz Intouro (III) E", reg: "ST-6985-AC" },
-        "063": { model: "Mercedes-Benz Intouro (III) E", reg: "ST-4839-AC" },
-        "064": { model: "Mercedes-Benz Intouro (III) E", reg: "ST-6992-AC" },
-        "065": { model: "Mercedes-Benz Intouro (III) E", reg: "ST-6986-AC" },
-        "066": { model: "Mercedes-Benz Intouro (III) E", reg: "ST-6990-AC" },
-        "067": { model: "Mercedes-Benz Intouro (III) E", reg: "ST-6988-AC" },
-        "068": { model: "Mercedes-Benz Intouro (III) E", reg: "ST-6980-AC" },
-        "069": { model: "Iveco Crossway LE City 12M", reg: "ST-5563-AC" },
-        "070": { model: "Iveco Crossway LE City 12M", reg: "ST-5538-AC" },
-        "071": { model: "Iveco Crossway LE City 12M", reg: "ST-5528-AC" },
-        "072": { model: "Iveco Crossway LE City 12M", reg: "ST-5536-AC" },
-        "073": { model: "Iveco Crossway LE City 12M", reg: "ST-5529-AC" },
-        "074": { model: "Iveco Crossway LE City 12M", reg: "ST-5542-AC" },
-        "075": { model: "Iveco Crossway LE City 12M", reg: "ST-5537-AC" },
-        "076": { model: "Iveco Crossway LE City 12M", reg: "ST-5539-AC" },
+        "001": { model: "MAN Lion's City", reg: "ST-2685-P" },
+        "002": { model: "MAN Lion's City", reg: "ST-2686-P" },
+        "003": { model: "MAN Lion's City", reg: "ST-2687-P" },
+        "004": { model: "MAN Lion's City", reg: "ST-2684-P" },
+        "005": { model: "MAN Lion's City", reg: "ST-2677-P" },
+        "006": { model: "MAN Lion's City", reg: "ST-2671-P" },
+        "007": { model: "MAN Lion's City", reg: "ST-2675-P" },
+        "008": { model: "MAN Lion's City", reg: "ST-2672-P" },
+        "009": { model: "MAN Lion's City", reg: "ST-2679-P" },
+        "010": { model: "MAN Lion's City", reg: "ST-2654-P" },
+        "011": { model: "MAN Lion's City", reg: "ST-2674-P" },
+        "012": { model: "MAN Lion's City", reg: "ST-2678-P" },
+        "013": { model: "MAN Lion's City", reg: "ST-2683-P" },
+        "014": { model: "MAN Lion's City", reg: "ST-2673-P" },
+        "015": { model: "Mercedes Citaro C2", reg: "ST-7852-P" },
+        "016": { model: "Mercedes Citaro C2", reg: "ST-7853-P" },
+        "017": { model: "Mercedes Citaro C2", reg: "ST-7854-P" },
+        "018": { model: "Mercedes Citaro C2", reg: "ST-7856-P" },
+        "019": { model: "Mercedes Citaro C2", reg: "ST-7857-P" },
+        "020": { model: "Mercedes Citaro C2", reg: "ST-7858-P" },
+        "021": { model: "Mercedes Citaro C2", reg: "ST-7859-P" },
+        "022": { model: "Mercedes Citaro C2", reg: "ST-8247-P" },
+        "023": { model: "Mercedes Citaro C2", reg: "ST-8246-P" },
+        "024": { model: "Mercedes Citaro C2", reg: "ST-8249-P" },
+        "025": { model: "Mercedes Citaro C2", reg: "ST-8248-P" },
+        "026": { model: "Mercedes Citaro C2", reg: "ST-8193-P" },
+        "027": { model: "Mercedes Citaro C2", reg: "ST-5619-P" },
+        "028": { model: "Mercedes Citaro C2", reg: "ST-5618-P" },
+        "029": { model: "Mercedes Citaro C2", reg: "ST-5614-P" },
+        "030": { model: "Mercedes Citaro C2", reg: "ST-5613-P" },
+        "031": { model: "Mercedes Citaro C2", reg: "ST-8106-P" },
+        "032": { model: "Mercedes Citaro C2", reg: "ST-8107-P" },
+        "033": { model: "Mercedes Citaro C2", reg: "ST-8124-P" },
+        "034": { model: "Mercedes Citaro C2", reg: "ST-8125-P" },
+        "035": { model: "Mercedes Citaro C2", reg: "ST-6921-T" },
+        "036": { model: "Mercedes Citaro C2", reg: "ST-6919-T" },
+        "037": { model: "Mercedes Citaro C2", reg: "ST-6912-T" },
+        "038": { model: "Mercedes Citaro C2", reg: "ST-6915-T" },
+        "039": { model: "Mercedes Citaro C2", reg: "ST-6914-T" },
+        "040": { model: "Mercedes Citaro C2", reg: "ST-4591-AI" },
+        "041": { model: "Mercedes Citaro C2", reg: "ST-6920-T" },
+        "042": { model: "Mercedes Citaro C2", reg: "ST-6918-T" },
+        "043": { model: "Mercedes Citaro C2", reg: "ST-6916-T" },
+        "044": { model: "Mercedes Citaro C2", reg: "ST-6917-T" },
+        "045": { model: "Iveco Crossway LE", reg: "ST-6772-T" },
+        "046": { model: "Iveco Crossway LE", reg: "ST-6763-T" },
+        "047": { model: "Iveco Crossway LE", reg: "ST-6775-T" },
+        "048": { model: "Iveco Crossway LE", reg: "ST-6943-T" },
+        "049": { model: "Iveco Crossway LE", reg: "ST-6948-T" },
+        "050": { model: "Iveco Crossway LE", reg: "ST-6947-T" },
+        "051": { model: "Iveco Crossway LE", reg: "ST-6927-T" },
+        "052": { model: "Iveco Crossway LE", reg: "ST-6924-T" },
+        "053": { model: "MAN Lion's City 12C", reg: "ST-2619-AC" },
+        "054": { model: "MAN Lion's City 12C", reg: "ST-2617-AC" },
+        "055": { model: "MAN Lion's City 12C", reg: "ST-2615-AC" },
+        "056": { model: "MAN Lion's City 12C", reg: "ST-2645-AC" },
+        "057": { model: "MAN Lion's City 12C", reg: "ST-3740-AK" },
+        "058": { model: "MAN Lion's City 12C", reg: "ST-2629-AC" },
+        "059": { model: "MAN Lion's City 12C", reg: "ST-2649-AC" },
+        "060": { model: "MAN Lion's City 12C", reg: "ST-2648-AC" },
+        "061": { model: "Mercedes Intouro", reg: "ST-4837-AC" },
+        "062": { model: "Mercedes Intouro", reg: "ST-6985-AC" },
+        "063": { model: "Mercedes Intouro", reg: "ST-4839-AC" },
+        "064": { model: "Mercedes Intouro", reg: "ST-6992-AC" },
+        "065": { model: "Mercedes Intouro", reg: "ST-6986-AC" },
+        "066": { model: "Mercedes Intouro", reg: "ST-6990-AC" },
+        "067": { model: "Mercedes Intouro", reg: "ST-6988-AC" },
+        "068": { model: "Mercedes Intouro", reg: "ST-6980-AC" },
+        "069": { model: "Iveco Crossway LE", reg: "ST-5563-AC" },
+        "070": { model: "Iveco Crossway LE", reg: "ST-5538-AC" },
+        "071": { model: "Iveco Crossway LE", reg: "ST-5528-AC" },
+        "072": { model: "Iveco Crossway LE", reg: "ST-5536-AC" },
+        "073": { model: "Iveco Crossway LE", reg: "ST-5529-AC" },
+        "074": { model: "Iveco Crossway LE", reg: "ST-5542-AC" },
+        "075": { model: "Iveco Crossway LE", reg: "ST-5537-AC" },
+        "076": { model: "Iveco Crossway LE", reg: "ST-5539-AC" },
         "077": { model: "Iveco Daily 70 C21", reg: "ST-1692-AD" },
         "078": { model: "Iveco Daily 70 C21", reg: "ST-1679-AD" },
         "079": { model: "Iveco Daily 70 C21", reg: "ST-1681-AD" },
         "080": { model: "Iveco Daily 70 C21", reg: "ST-1684-AD" },
         "081": { model: "Iveco Daily 70 C21", reg: "ST-1686-AD" },
         "082": { model: "Iveco Daily 70 C21", reg: "ST-1685-AD" },
-        "083": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-1695-AD" },
-        "084": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-1697-AD" },
-        "085": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-1687-AD" },
-        "086": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-1693-AD" },
-        "087": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-8909-AH" },
-        "088": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-1698-AD" },
-        "089": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-4185-AD" },
-        "090": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-2432-AK" },
-        "091": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-4184-AD" },
-        "092": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-1706-AD" },
+        "083": { model: "Mercedes Citaro C2", reg: "ST-1695-AD" },
+        "084": { model: "Mercedes Citaro C2", reg: "ST-1697-AD" },
+        "085": { model: "Mercedes Citaro C2", reg: "ST-1687-AD" },
+        "086": { model: "Mercedes Citaro C2", reg: "ST-1693-AD" },
+        "087": { model: "Mercedes Citaro C2", reg: "ST-8909-AH" },
+        "088": { model: "Mercedes Citaro C2", reg: "ST-1698-AD" },
+        "089": { model: "Mercedes Citaro C2", reg: "ST-4185-AD" },
+        "090": { model: "Mercedes Citaro C2", reg: "ST-2432-AK" },
+        "091": { model: "Mercedes Citaro C2", reg: "ST-4184-AD" },
+        "092": { model: "Mercedes Citaro C2", reg: "ST-1706-AD" },
         "093": { model: "Otokar Vectio U LE", reg: "ST-7436-AD" },
         "094": { model: "Otokar Vectio U LE", reg: "ST-7431-AD" },
         "095": { model: "Otokar Vectio U LE", reg: "ST-7442-AD" },
@@ -347,26 +245,26 @@
         "097": { model: "Otokar Vectio U LE", reg: "ST-7435-AD" },
         "098": { model: "Otokar Vectio U LE", reg: "ST-7439-AD" },
         "099": { model: "Otokar Vectio U LE", reg: "ST-7429-AD" },
-        "100": { model: "Mercedes-Benz Sprinter 519 CDI TR", reg: "ST-3460-AE" },
-        "101": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-4496-AI" },
-        "102": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-4501-AI" },
-        "103": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-6319-AH" },
-        "104": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-6318-AH" },
-        "105": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-5421-AH" },
-        "106": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-5418-AH" },
-        "107": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-5382-AH" },
-        "108": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-5423-AH" },
-        "109": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-2257-AI" },
-        "110": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-5401-AH" },
-        "111": { model: "MAN Lion's City (NL 323)", reg: "ST-8802-AH" },
-        "112": { model: "MAN Lion's City (NL 323)", reg: "ST-8803-AH" },
-        "113": { model: "MAN Lion's City (NL 323)", reg: "ST-2132-AI" },
-        "114": { model: "MAN Lion's City (NL 323)", reg: "ST-2134-AI" },
-        "115": { model: "MAN Lion's City (NL 323)", reg: "ST-2135-AI" },
-        "116": { model: "MAN Lion's City (NL 323)", reg: "ST-2136-AI" },
-        "117": { model: "MAN Lion's City (NL 323)", reg: "ST-2137-AI" },
-        "118": { model: "MAN Lion's City (NL 323)", reg: "ST-2138-AI" },
-        "119": { model: "Iveco Daily 50C17 CV/P", reg: "ST-8311-AI" },
+        "100": { model: "Mercedes Sprinter", reg: "ST-3460-AE" },
+        "101": { model: "Mercedes Citaro C2", reg: "ST-4496-AI" },
+        "102": { model: "Mercedes Citaro C2", reg: "ST-4501-AI" },
+        "103": { model: "Mercedes Citaro C2", reg: "ST-6319-AH" },
+        "104": { model: "Mercedes Citaro C2", reg: "ST-6318-AH" },
+        "105": { model: "Mercedes Citaro C2", reg: "ST-5421-AH" },
+        "106": { model: "Mercedes Citaro C2", reg: "ST-5418-AH" },
+        "107": { model: "Mercedes Citaro C2", reg: "ST-5382-AH" },
+        "108": { model: "Mercedes Citaro C2", reg: "ST-5423-AH" },
+        "109": { model: "Mercedes Citaro C2", reg: "ST-2257-AI" },
+        "110": { model: "Mercedes Citaro C2", reg: "ST-5401-AH" },
+        "111": { model: "MAN Lion's City", reg: "ST-8802-AH" },
+        "112": { model: "MAN Lion's City", reg: "ST-8803-AH" },
+        "113": { model: "MAN Lion's City", reg: "ST-2132-AI" },
+        "114": { model: "MAN Lion's City", reg: "ST-2134-AI" },
+        "115": { model: "MAN Lion's City", reg: "ST-2135-AI" },
+        "116": { model: "MAN Lion's City", reg: "ST-2136-AI" },
+        "117": { model: "MAN Lion's City", reg: "ST-2137-AI" },
+        "118": { model: "MAN Lion's City", reg: "ST-2138-AI" },
+        "119": { model: "Iveco Daily 50C17", reg: "ST-8311-AI" },
         "120": { model: "Iveco Daily 50C18", reg: "ST-3869-AN" },
         "121": { model: "Iveco Daily 50C18", reg: "ST-3865-AN" },
         "122": { model: "Iveco Daily 50C18", reg: "ST-3854-AN" },
@@ -374,29 +272,29 @@
         "124": { model: "Iveco Daily 50C18", reg: "ST-3871-AN" },
         "125": { model: "Iveco Daily 50C18", reg: "ST-3853-AN" },
         "126": { model: "Iveco Daily 50C18", reg: "ST-3868-AN" },
-        "246": { model: "MAN Lion's Regio (ÜL 314)", reg: "ST-462-RM" },
-        "248": { model: "MAN Lion's Regio (ÜL 314)", reg: "ST-457-RM" },
-        "249": { model: "MAN Lion's Regio (ÜL 314)", reg: "ST-459-RM" },
-        "250": { model: "MAN Lion's Regio (ÜL 314)", reg: "ST-463-RM" },
-        "251": { model: "MAN Lion's Regio (ÜL 314)", reg: "ST-461-RM" },
-        "252": { model: "MAN Lion's Regio (ÜL 314)", reg: "ST-460-RM" },
-        "253": { model: "MAN Lion's Regio (ÜL 314)", reg: "ST-464-RM" },
-        "254": { model: "MAN Lion's Regio (ÜL 314)", reg: "ST-465-RM" },
-        "263": { model: "Mercedes-Benz O530 Citaro (Facelift)", reg: "ST-943-RM" },
-        "264": { model: "Mercedes-Benz O530 Citaro (Facelift)", reg: "ST-937-RM" },
-        "265": { model: "Mercedes-Benz O530 Citaro (Facelift)", reg: "ST-941-RM" },
-        "266": { model: "Mercedes-Benz O530 G Citaro (Facelift)", reg: "ST-586-RN" },
-        "267": { model: "Mercedes-Benz O530 G Citaro (Facelift)", reg: "ST-295-SO" },
-        "268": { model: "Mercedes-Benz O530 G Citaro (Facelift)", reg: "ST-903-RM" },
-        "269": { model: "Mercedes-Benz O530 G Citaro (Facelift)", reg: "ST-597-RN" },
-        "270": { model: "Mercedes-Benz O530 G Citaro (Facelift)", reg: "ST-591-RN" },
-        "271": { model: "Mercedes-Benz O530 G Citaro (Facelift)", reg: "ST-904-RM" },
-        "272": { model: "Mercedes-Benz O530 G Citaro (Facelift)", reg: "ST-584-RN" },
-        "273": { model: "Mercedes-Benz O530 G Citaro (Facelift)", reg: "ST-905-RM" },
-        "274": { model: "Mercedes-Benz O530 G Citaro (Facelift)", reg: "ST-6637-AO" },
-        "275": { model: "Mercedes-Benz O530 G Citaro (Facelift)", reg: "ST-132-TN" },
-        "276": { model: "Irisbus Daily Tourys 50 C15 B/P", reg: "ST-841-ZL" },
-        "277": { model: "Irisbus Daily Tourys 50 C15 B/P", reg: "ST-842-ZL" },
+        "246": { model: "MAN Lion's Regio", reg: "ST-462-RM" },
+        "248": { model: "MAN Lion's Regio", reg: "ST-457-RM" },
+        "249": { model: "MAN Lion's Regio", reg: "ST-459-RM" },
+        "250": { model: "MAN Lion's Regio", reg: "ST-463-RM" },
+        "251": { model: "MAN Lion's Regio", reg: "ST-461-RM" },
+        "252": { model: "MAN Lion's Regio", reg: "ST-460-RM" },
+        "253": { model: "MAN Lion's Regio", reg: "ST-464-RM" },
+        "254": { model: "MAN Lion's Regio", reg: "ST-465-RM" },
+        "263": { model: "Mercedes Citaro", reg: "ST-943-RM" },
+        "264": { model: "Mercedes Citaro", reg: "ST-937-RM" },
+        "265": { model: "Mercedes Citaro", reg: "ST-941-RM" },
+        "266": { model: "Mercedes Citaro G", reg: "ST-586-RN" },
+        "267": { model: "Mercedes Citaro G", reg: "ST-295-SO" },
+        "268": { model: "Mercedes Citaro G", reg: "ST-903-RM" },
+        "269": { model: "Mercedes Citaro G", reg: "ST-597-RN" },
+        "270": { model: "Mercedes Citaro G", reg: "ST-591-RN" },
+        "271": { model: "Mercedes Citaro G", reg: "ST-904-RM" },
+        "272": { model: "Mercedes Citaro G", reg: "ST-584-RN" },
+        "273": { model: "Mercedes Citaro G", reg: "ST-905-RM" },
+        "274": { model: "Mercedes Citaro G", reg: "ST-6637-AO" },
+        "275": { model: "Mercedes Citaro G", reg: "ST-132-TN" },
+        "276": { model: "Irisbus Daily Tourys", reg: "ST-841-ZL" },
+        "277": { model: "Irisbus Daily Tourys", reg: "ST-842-ZL" },
         "279": { model: "Iveco Daily 50 C18", reg: "ST-4968-M" },
         "285": { model: "Irisbus Crossway LE", reg: "ST-937-VU" },
         "286": { model: "Irisbus Crossway LE", reg: "ST-938-VU" },
@@ -409,38 +307,30 @@
         "293": { model: "Irisbus Crossway", reg: "ST-945-VU" },
         "294": { model: "Irisbus Crossway", reg: "ST-946-VU" },
         "295": { model: "Irisbus Crossway", reg: "ST-947-VU" },
-        "296": { model: "MAN Lion's City (NL 323)", reg: "ST-901-ZE" },
-        "297": { model: "MAN Lion's City (NL 323)", reg: "ST-902-ZE" },
-        "298": { model: "MAN Lion's City (NL 323)", reg: "ST-3094-AD" },
-        "299": { model: "MAN Lion's City (NL 323)", reg: "ST-5427-C" },
-        "300": { model: "MAN Lion's City (NL 323)", reg: "ST-905-ZE" },
-        "301": { model: "MAN Lion's City (NL 323)", reg: "ST-906-ZE" },
-        "307": { model: "Mercedes-Benz O530 G Citaro (Facelift)", reg: "ST-9429-AC" },
-        "308": { model: "Mercedes-Benz O530 G Citaro (Facelift)", reg: "ST-8671-G" },
-        "309": { model: "Irisbus Daily 50 C18 B/P", reg: "ST-4514-J" },
-        "310": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-8693-J" },
-        "311": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-8692-J" },
-        "312": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-9598-J" },
-        "313": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-9596-J" },
-        "314": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-9643-J" },
-        "315": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-9664-J" },
-        "316": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-9641-J" },
-        "317": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-9613-J" },
-        "318": { model: "Mercedes-Benz O530 G Citaro C2", reg: "ST-9627-J" }
+        "296": { model: "MAN Lion's City", reg: "ST-901-ZE" },
+        "297": { model: "MAN Lion's City", reg: "ST-902-ZE" },
+        "298": { model: "MAN Lion's City", reg: "ST-3094-AD" },
+        "299": { model: "MAN Lion's City", reg: "ST-5427-C" },
+        "300": { model: "MAN Lion's City", reg: "ST-905-ZE" },
+        "301": { model: "MAN Lion's City", reg: "ST-906-ZE" },
+        "307": { model: "Mercedes Citaro G", reg: "ST-9429-AC" },
+        "308": { model: "Mercedes Citaro G", reg: "ST-8671-G" },
+        "309": { model: "Irisbus Daily 50 C18", reg: "ST-4514-J" },
+        "310": { model: "Mercedes Citaro C2", reg: "ST-8693-J" },
+        "311": { model: "Mercedes Citaro C2", reg: "ST-8692-J" },
+        "312": { model: "Mercedes Citaro C2", reg: "ST-9598-J" },
+        "313": { model: "Mercedes Citaro C2", reg: "ST-9596-J" },
+        "314": { model: "Mercedes Citaro C2", reg: "ST-9643-J" },
+        "315": { model: "Mercedes Citaro C2", reg: "ST-9664-J" },
+        "316": { model: "Mercedes Citaro C2", reg: "ST-9641-J" },
+        "317": { model: "Mercedes Citaro C2", reg: "ST-9613-J" },
+        "318": { model: "Mercedes Citaro C2", reg: "ST-9627-J" }
     };
 
-    // ============================================================
-    // OKRETIŠTA
-    // ============================================================
-    var okretista = {
-        "SUKOISAN": { lat: 43.51561, lng: 16.44330, radius: 120 },
-        "TROGIR": { lat: 43.51800, lng: 16.25100, radius: 120 },
-        "OMIS": { lat: 43.44000, lng: 16.68800, radius: 120 },
-        "RAVNICKI_MOST": { lat: 43.42557, lng: 16.71155, radius: 120 }
-    };
+    var allGbrs = Object.keys(vehicleData).sort((a,b) => Number(a) - Number(b));
 
     // ============================================================
-    // APLIKACIJA
+    // 2. MAPA
     // ============================================================
     var map = L.map('map').setView([43.51, 16.44], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -448,239 +338,196 @@
     }).addTo(map);
 
     var markers = {};
+    var lastSeen = {};
+    var busStatus = {};
     var allStops = [];
     var stopMarkers = [];
     var stopsVisible = false;
-    var lastSeen = {};
-    var departureLog = {};
-    var busStatus = {};
+    var okretista = {};
 
     // ============================================================
-    // POMOĆNE FUNKCIJE
+    // 3. AUTOMATSKO PREPOZNAVANJE OKRETIŠTA
     // ============================================================
-    function distance(lat1, lon1, lat2, lon2) {
-        var R = 6371000;
-        var dLat = (lat2 - lat1) * Math.PI / 180;
-        var dLon = (lon2 - lon1) * Math.PI / 180;
-        var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    function pronadjiOkretista() {
+        if (allStops.length === 0) return;
+        
+        var linije = {};
+        allStops.forEach(stop => {
+            if (!stop.routes) return;
+            stop.routes.forEach(route => {
+                var line = route.name;
+                if (!linije[line]) linije[line] = [];
+                linije[line].push(stop);
+            });
+        });
+        
+        for (var line in linije) {
+            var stops = linije[line];
+            if (stops.length < 2) continue;
+            
+            var first = stops[0];
+            var last = stops[stops.length - 1];
+            
+            var firstKey = first.name.replace(/ /g, '_').toUpperCase();
+            var lastKey = last.name.replace(/ /g, '_').toUpperCase();
+            
+            if (!okretista[firstKey]) {
+                okretista[firstKey] = {
+                    lat: first.geography.coordinates[1],
+                    lng: first.geography.coordinates[0],
+                    radius: 120,
+                    linije: [line]
+                };
+            } else {
+                okretista[firstKey].linije.push(line);
+            }
+            
+            if (!okretista[lastKey]) {
+                okretista[lastKey] = {
+                    lat: last.geography.coordinates[1],
+                    lng: last.geography.coordinates[0],
+                    radius: 120,
+                    linije: [line]
+                };
+            } else {
+                okretista[lastKey].linije.push(line);
+            }
+        }
+        
+        console.log('Pronađeno okretišta:', Object.keys(okretista).length);
     }
 
-    function formatTime(date) {
-        return date.toLocaleDateString('hr-HR') + ' ' + date.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' });
+    // ============================================================
+    // 4. POMOĆNE FUNKCIJE
+    // ============================================================
+    function formatTime(d) {
+        return d.toLocaleDateString('hr-HR') + ' ' + d.toLocaleTimeString('hr-HR', { hour: '2-digit', minute: '2-digit' });
     }
 
     function getDirection(gbr, lat, lng) {
         if (busStatus[gbr] && busStatus[gbr].lastOkretiste) {
             return busStatus[gbr].lastOkretiste;
         }
-        var closest = null;
-        var minDist = Infinity;
+        var closest = null, minDist = Infinity;
         for (var key in okretista) {
             var okr = okretista[key];
-            var dist = distance(lat, lng, okr.lat, okr.lng);
-            if (dist < minDist) {
-                minDist = dist;
-                closest = key;
-            }
+            var d = Math.sqrt(Math.pow(lat - okr.lat, 2) + Math.pow(lng - okr.lng, 2));
+            if (d < minDist) { minDist = d; closest = key; }
         }
         return closest;
     }
 
-    // ============================================================
-    // IKONE
-    // ============================================================
-    function createBusIcon(lineName, garageNumber) {
-        var isSpecial = ['307', '308', 307, 308].includes(String(garageNumber).trim());
-        var html = isSpecial ?
-            `<div class="bus-label-red"><div class="bus-top">${lineName}</div><div class="bus-bottom-red">${garageNumber}</div></div>` :
-            `<div class="bus-label"><div class="bus-top">${lineName}</div><div class="bus-bottom">${garageNumber}</div></div>`;
-        return L.divIcon({ html: html, className: '', iconSize: [56, 42], iconAnchor: [28, 21] });
+    function makeIcon(line, gbr) {
+        var isRed = (gbr == '307' || gbr == '308');
+        var cls = isRed ? 'bus-icon-red' : 'bus-icon';
+        return L.divIcon({
+            html: `<div class="${cls}">${line}<br><span class="num">${gbr}</span></div>`,
+            className: '',
+            iconSize: [48, 32],
+            iconAnchor: [24, 16]
+        });
     }
 
     // ============================================================
-    // STANICE
+    // 5. KLIK NA AUTOBUS - OMAH POPUP SA SVIM PODACIMA
+    // ============================================================
+    function onBusClick(e) {
+        var m = e.target;
+        var gbr = m.busData?.garageNumber;
+        var line = m.busData?.name;
+        if (!gbr || !line) return;
+
+        var v = vehicleData[gbr] || {};
+        var time = lastSeen[gbr] || 'Nema podataka';
+        var dir = getDirection(gbr, m.getLatLng().lat, m.getLatLng().lng);
+        var dirName = dir ? dir.replace('_', ' ') : 'Nepoznat';
+
+        var html = `<div style="font-family:Arial,sans-serif;min-width:200px;padding:4px 0;">
+            <div style="color:#ff6600;font-weight:700;font-size:16px;margin-bottom:4px;">🚌 Linija ${line}</div>
+            <div style="padding:3px 0;font-size:13px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;">
+                <span style="color:#666;">Garažni broj:</span><span style="color:#1a1a2e;font-weight:600;">${gbr}</span>
+            </div>
+            <div style="padding:3px 0;font-size:13px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;">
+                <span style="color:#666;">Registarska:</span><span style="color:#1a1a2e;font-weight:600;">${v.reg || 'Nepoznato'}</span>
+            </div>
+            <div style="padding:3px 0;font-size:13px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;">
+                <span style="color:#666;">Model:</span><span style="color:#1a1a2e;font-weight:600;">${v.model || 'Nepoznato'}</span>
+            </div>
+            <div style="padding:3px 0;font-size:13px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;">
+                <span style="color:#666;">Zadnji put:</span><span style="color:#1a1a2e;font-weight:600;">${time}</span>
+            </div>
+            <div style="background:#e8f5e9;border-radius:8px;padding:6px;text-align:center;color:#2e7d32;font-weight:600;font-size:12px;margin-top:4px;">
+                ➡️ Smjer: ${dirName}
+            </div>
+        </div>`;
+        m.bindPopup(html).openPopup();
+    }
+
+    // ============================================================
+    // 6. STANICE
     // ============================================================
     function loadStops() {
         fetch('stops.json')
             .then(r => r.json())
-            .then(stops => { allStops = stops; })
-            .catch(e => console.error(e));
-    }
-
-    function addStopsToMap() {
-        if (stopMarkers.length) return;
-        allStops.forEach(s => {
-            var m = L.circleMarker([s.geography.coordinates[1], s.geography.coordinates[0]], {
-                radius: 5, fillColor: "#3388ff", color: "#fff", weight: 1.5, fillOpacity: 0.8
-            }).addTo(map);
-            var routes = s.routes ? s.routes.map(r => r.name).join(', ') : '';
-            m.bindPopup(`<b>${s.name}</b><br><b>Linije:</b> ${routes || 'Nema'}`);
-            stopMarkers.push(m);
-        });
-    }
-
-    function removeStopsFromMap() {
-        stopMarkers.forEach(m => map.removeLayer(m));
-        stopMarkers = [];
+            .then(stops => {
+                allStops = stops;
+                pronadjiOkretista();
+                console.log('Učitano stanica:', stops.length);
+            })
+            .catch(e => console.error('Greška:', e));
     }
 
     function toggleStops() {
         stopsVisible = !stopsVisible;
         if (stopsVisible) {
-            addStopsToMap();
-            document.getElementById('toggleStopsBtn').innerHTML = '<i class="fas fa-map-marker-alt"></i><span>Sakrij stanice</span>';
-        } else {
-            removeStopsFromMap();
-            document.getElementById('toggleStopsBtn').innerHTML = '<i class="fas fa-map-marker-alt"></i><span>Prikaži stanice</span>';
-        }
-    }
-
-    // ============================================================
-    // KLIK NA AUTOBUS - OMAH SVI PODACI, BEZ "KLIKNI ZA VIŠE"
-    // ============================================================
-    function onBusClick(e) {
-        var marker = e.target;
-        var gbr = marker.busData?.garageNumber;
-        var line = marker.busData?.name;
-        var lat = marker.getLatLng().lat;
-        var lng = marker.getLatLng().lng;
-        
-        if (!gbr || !line) return;
-        
-        var vehicle = vehicleData[String(gbr)] || {};
-        var time = lastSeen[gbr] || 'Nema podataka';
-        var direction = getDirection(gbr, lat, lng);
-        var dirName = direction ? direction.replace('_', ' ') : 'Nepoznat';
-        
-        var html = `<div class="custom-popup">
-            <div class="title">🚌 Linija ${line}</div>
-            <div class="row"><span class="label">Garažni broj:</span><span class="value">${gbr}</span></div>
-            <div class="row"><span class="label">Registarska oznaka:</span><span class="value">${vehicle.reg || 'Nepoznato'}</span></div>
-            <div class="row"><span class="label">Model:</span><span class="value">${vehicle.model || 'Nepoznato'}</span></div>
-            <div class="row"><span class="label">Zadnji put viđen:</span><span class="value">${time}</span></div>
-            <div class="direction"><i class="fas fa-arrow-right"></i> Smjer: ${dirName}</div>
-        </div>`;
-        
-        marker.bindPopup(html).openPopup();
-    }
-
-    // ============================================================
-    // PRAĆENJE POLAZAKA
-    // ============================================================
-    function checkDeparture(gbr, line, lat, lng) {
-        var now = new Date();
-        var timeStr = formatTime(now);
-
-        lastSeen[gbr] = timeStr;
-        saveHistory();
-
-        if (!busStatus[gbr]) {
-            busStatus[gbr] = { status: 'unknown', lastOkretiste: null, lastPosition: { lat: lat, lng: lng } };
-        }
-
-        busStatus[gbr].lastPosition = { lat: lat, lng: lng };
-
-        var isOnOkretiste = false;
-        var currentOkretiste = null;
-
-        for (var key in okretista) {
-            var okr = okretista[key];
-            var dist = distance(lat, lng, okr.lat, okr.lng);
-            if (dist < okr.radius) {
-                isOnOkretiste = true;
-                currentOkretiste = key;
-                break;
-            }
-        }
-
-        if (isOnOkretiste) {
-            if (busStatus[gbr].status === 'driving' && busStatus[gbr].lastOkretiste === currentOkretiste) {
-                if (!departureLog[gbr]) departureLog[gbr] = [];
-                departureLog[gbr].push({ 
-                    tip: 'DOLAZAK', 
-                    okretiste: currentOkretiste, 
-                    vrijeme: timeStr, 
-                    linija: line 
+            if (stopMarkers.length === 0 && allStops.length) {
+                allStops.forEach(s => {
+                    var m = L.circleMarker([s.geography.coordinates[1], s.geography.coordinates[0]], {
+                        radius: 5, fillColor: "#3388ff", color: "#fff", weight: 1.5, fillOpacity: 0.8
+                    }).addTo(map);
+                    var routes = s.routes ? s.routes.map(r => r.name).join(', ') : '';
+                    m.bindPopup(`<b>${s.name}</b><br><b>Linije:</b> ${routes || 'Nema'}`);
+                    stopMarkers.push(m);
                 });
-                saveDepartures();
             }
-            busStatus[gbr].status = 'parking';
-            busStatus[gbr].lastOkretiste = currentOkretiste;
+            document.getElementById('stopsBtn').innerHTML = '📍 Sakrij stanice';
         } else {
-            if (busStatus[gbr].status === 'parking' && busStatus[gbr].lastOkretiste) {
-                var lastOkr = okretista[busStatus[gbr].lastOkretiste];
-                var distFromLastOkr = distance(lat, lng, lastOkr.lat, lastOkr.lng);
-                if (distFromLastOkr > 100) {
-                    if (!departureLog[gbr]) departureLog[gbr] = [];
-                    departureLog[gbr].push({ 
-                        tip: 'POLAZAK', 
-                        okretiste: busStatus[gbr].lastOkretiste, 
-                        vrijeme: timeStr, 
-                        linija: line 
-                    });
-                    saveDepartures();
-                    busStatus[gbr].status = 'driving';
-                }
-            } else {
-                busStatus[gbr].status = 'driving';
-            }
+            stopMarkers.forEach(m => map.removeLayer(m));
+            stopMarkers = [];
+            document.getElementById('stopsBtn').innerHTML = '📍 Prikaži stanice';
         }
     }
 
     // ============================================================
-    // SPREMANJE
+    // 7. PANEL POPIS
     // ============================================================
-    function saveHistory() {
-        try { localStorage.setItem('busLastSeen', JSON.stringify(lastSeen)); } catch(e) {}
-    }
-    function loadHistory() {
-        try { var data = localStorage.getItem('busLastSeen'); if (data) lastSeen = JSON.parse(data); } catch(e) {}
-    }
-    function saveDepartures() {
-        try { localStorage.setItem('busDepartures', JSON.stringify(departureLog)); } catch(e) {}
-    }
-    function loadDepartures() {
-        try { var data = localStorage.getItem('busDepartures'); if (data) departureLog = JSON.parse(data); } catch(e) {}
-    }
-
-    // ============================================================
-    // POPIS SVIH VOZILA
-    // ============================================================
-    function renderFullList() {
-        var list = document.getElementById('historyList');
+    function renderPanel() {
+        var el = document.getElementById('panelList');
         var html = '';
-
-        allGbrList.forEach(gbr => {
+        allGbrs.forEach(gbr => {
             var time = lastSeen[gbr] || 'Nema podataka';
             var marker = markers[gbr];
             var line = marker ? (marker.busData?.name || '') : '';
-            var statusClass = (time !== 'Nema podataka') ? '' : 'nodata';
             var lineDisplay = line || '-';
-            
-            html += `<div class="history-item">
+            var hasData = (time !== 'Nema podataka');
+            html += `<div class="panel-item">
                 <span class="gbr">${gbr}</span>
                 <span class="line">${lineDisplay}</span>
                 <span class="time">${time}</span>
-                <span class="status ${statusClass}">${(time !== 'Nema podataka') ? '✅' : '❌'}</span>
+                <span class="${hasData ? 'ok' : 'no'}">${hasData ? '✅' : '❌'}</span>
             </div>`;
         });
-
-        list.innerHTML = html;
+        el.innerHTML = html || '<div class="panel-empty">Još nema podataka</div>';
     }
 
-    function toggleHistory() {
-        var panel = document.getElementById('historyPanel');
-        panel.classList.toggle('visible');
-        if (panel.classList.contains('visible')) {
-            renderFullList();
-        }
+    function togglePanel() {
+        var p = document.getElementById('panel');
+        p.classList.toggle('visible');
+        if (p.classList.contains('visible')) renderPanel();
     }
 
     // ============================================================
-    // LIVE AUTOBUSI
+    // 8. DOHVATI LIVE AUTOBUSE
     // ============================================================
     async function fetchLiveBuses() {
         try {
@@ -695,38 +542,30 @@
                 var lat = bus.latitude;
                 var lng = bus.longitude;
 
-                checkDeparture(gbr, line, lat, lng);
+                var now = new Date();
+                lastSeen[gbr] = formatTime(now);
+                try { localStorage.setItem('busLastSeen', JSON.stringify(lastSeen)); } catch(e) {}
 
-                var icon = createBusIcon(line, gbr);
-                
+                if (!busStatus[gbr]) busStatus[gbr] = { lastOkretiste: null };
+
+                var isNear = false;
+                for (var key in okretista) {
+                    var okr = okretista[key];
+                    var d = Math.sqrt(Math.pow(lat - okr.lat, 2) + Math.pow(lng - okr.lng, 2));
+                    if (d < 0.001) { isNear = true; busStatus[gbr].lastOkretiste = key; break; }
+                }
+
+                var icon = makeIcon(line, gbr);
                 if (markers[gbr]) {
                     markers[gbr].setLatLng([lat, lng]);
-                    markers[gbr].setIcon(createBusIcon(line, gbr));
+                    markers[gbr].setIcon(makeIcon(line, gbr));
                     markers[gbr].busData = { name: line, garageNumber: gbr };
                 } else {
                     var marker = L.marker([lat, lng], { icon: icon }).addTo(map);
                     marker.busData = { name: line, garageNumber: gbr };
-                    // DIREKTNO KLIK - OMAH POPUP
                     marker.on('click', onBusClick);
                     markers[gbr] = marker;
                 }
-                
-                // NEMA "KLIKNI ZA VIŠE" - OMAH SVE
-                var vehicle = vehicleData[String(gbr)] || {};
-                var time = lastSeen[gbr] || 'Nema podataka';
-                var direction = getDirection(gbr, lat, lng);
-                var dirName = direction ? direction.replace('_', ' ') : 'Nepoznat';
-                
-                var html = `<div class="custom-popup">
-                    <div class="title">🚌 Linija ${line}</div>
-                    <div class="row"><span class="label">Garažni broj:</span><span class="value">${gbr}</span></div>
-                    <div class="row"><span class="label">Registarska oznaka:</span><span class="value">${vehicle.reg || 'Nepoznato'}</span></div>
-                    <div class="row"><span class="label">Model:</span><span class="value">${vehicle.model || 'Nepoznato'}</span></div>
-                    <div class="row"><span class="label">Zadnji put viđen:</span><span class="value">${time}</span></div>
-                    <div class="direction"><i class="fas fa-arrow-right"></i> Smjer: ${dirName}</div>
-                </div>`;
-                
-                markers[gbr].bindPopup(html);
             });
 
             for (var gbr in markers) {
@@ -738,92 +577,47 @@
 
             var count = Object.keys(markers).length;
             document.getElementById('statsText').innerHTML = `${new Date().toLocaleTimeString('hr-HR')} | ${count}`;
-            document.getElementById('busCount').innerHTML = `${count}`;
+            document.getElementById('busCount').innerHTML = count;
 
-            if (document.getElementById('historyPanel').classList.contains('visible')) {
-                renderFullList();
-            }
-        } catch (e) {
+            if (document.getElementById('panel').classList.contains('visible')) renderPanel();
+        } catch(e) {
             console.error(e);
+            document.getElementById('statsText').innerHTML = 'Greška';
         }
     }
 
     // ============================================================
-    // PRETRAGA
+    // 9. PRETRAGA
     // ============================================================
-    function resetFilter() {
+    function searchBuses() {
+        var val = document.getElementById('searchInput').value.toLowerCase().trim();
+        var count = 0;
         for (var gbr in markers) {
-            markers[gbr].setOpacity(1);
-        }
-        document.getElementById('busCount').innerHTML = `${Object.keys(markers).length}`;
-    }
-
-    function showSuggestions() {
-        var val = document.getElementById('busSearch').value.toLowerCase().trim();
-        var div = document.getElementById('suggestionsList');
-        if (val.length < 1) { 
-            div.style.display = 'none';
-            resetFilter();
-            return; 
-        }
-
-        var suggestions = [];
-        for (var gbr in markers) {
-            var busData = markers[gbr].busData || {};
-            var line = busData.name || '';
+            var line = markers[gbr].busData?.name || '';
             if (line.toLowerCase().includes(val) || String(gbr).includes(val)) {
-                suggestions.push({ gbr: gbr, line: line, marker: markers[gbr] });
+                markers[gbr].setOpacity(1);
+                count++;
+            } else {
+                markers[gbr].setOpacity(0.2);
             }
         }
-
-        if (suggestions.length > 0) {
-            div.innerHTML = '';
-            suggestions.slice(0, 10).forEach(item => {
-                var d = document.createElement('div');
-                d.className = 'autocomplete-item';
-                d.innerHTML = `<span class="autocomplete-gbr"><i class="fas fa-bus"></i> ${item.gbr}</span><span class="autocomplete-line">Linija ${item.line}</span>`;
-                d.onclick = function(marker, gbr) {
-                    return function() {
-                        document.getElementById('busSearch').value = gbr;
-                        div.style.display = 'none';
-                        map.setView(marker.getLatLng(), 16);
-                        marker.openPopup();
-                        resetFilter();
-                    };
-                }(item.marker, item.gbr);
-                div.appendChild(d);
-            });
-            div.style.display = 'block';
-        } else {
-            div.style.display = 'none';
-        }
+        document.getElementById('busCount').innerHTML = count;
     }
 
     // ============================================================
-    // POKRENI
+    // 10. POKRENI
     // ============================================================
-    document.getElementById('toggleStopsBtn').onclick = toggleStops;
-    
-    document.getElementById('busSearch').addEventListener('keyup', showSuggestions);
-    document.getElementById('busSearch').addEventListener('blur', function() {
+    document.getElementById('stopsBtn').onclick = toggleStops;
+    document.getElementById('searchInput').addEventListener('input', searchBuses);
+    document.getElementById('searchInput').addEventListener('blur', function() {
         setTimeout(function() {
-            document.getElementById('suggestionsList').style.display = 'none';
-            resetFilter();
-        }, 200);
+            for (var gbr in markers) markers[gbr].setOpacity(1);
+            document.getElementById('busCount').innerHTML = Object.keys(markers).length;
+        }, 300);
     });
 
-    document.addEventListener('click', function(e) {
-        var container = document.querySelector('.search-container');
-        if (container && !container.contains(e.target)) {
-            document.getElementById('suggestionsList').style.display = 'none';
-            resetFilter();
-        }
-    });
+    map.on('dblclick', togglePanel);
 
-    map.on('dblclick', toggleHistory);
-
-    loadHistory();
-    loadDepartures();
     loadStops();
     fetchLiveBuses();
     setInterval(fetchLiveBuses, 7000);
