@@ -171,8 +171,8 @@
             padding: 14px 16px;
             max-height: calc(100vh - 160px);
             overflow-y: auto;
-            min-width: 240px;
-            max-width: 320px;
+            min-width: 280px;
+            max-width: 360px;
             display: none;
             border: 1px solid rgba(0, 0, 0, 0.06);
         }
@@ -198,7 +198,7 @@
             color: #ff6600;
         }
         .panel-item {
-            padding: 4px 0;
+            padding: 5px 0;
             border-bottom: 1px solid #f0f0f0;
             font-size: 12px;
             display: flex;
@@ -284,6 +284,7 @@
                 left: 8px;
                 max-width: none;
                 top: 64px;
+                min-width: auto;
             }
             .bus-label,
             .bus-label-red {
@@ -306,25 +307,20 @@
 </head>
 <body>
 
-    <!-- TRAŽILICA -->
     <div class="search-box">
         <span style="color:#ff6600;font-size:14px;">🔍</span>
         <input type="text" id="searchInput" placeholder="Gbr ili linija...">
         <span class="badge" id="busCount">0</span>
     </div>
 
-    <!-- GUMB POPIS -->
     <button class="btn-list" onclick="togglePanel()">📋 <span>Popis</span></button>
 
-    <!-- GUMB STANICE -->
     <div class="btn-stops">
         <button id="stopsBtn">📍 Prikaži stanice</button>
     </div>
 
-    <!-- STATS -->
     <div class="stats" id="statsText">Učitavanje...</div>
 
-    <!-- PANEL POPIS -->
     <div class="panel" id="panel">
         <h4>
             <span>🚌 Sva vozila</span>
@@ -333,14 +329,13 @@
         <div id="panelList"><div class="panel-empty">Učitavanje...</div></div>
     </div>
 
-    <!-- MAPA -->
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
     </script>
     <script>
         // ============================================================
-        // 1. PODACI O VOZILIMA (svi garažni brojevi)
+        // 1. PODACI O VOZILIMA (SVI GARAŽNI BROJEVI)
         // ============================================================
         var vehicleData = {
             "001": { model: "MAN Lion's City", reg: "ST-2685-P" },
@@ -540,25 +535,42 @@
         var stopsVisible = false;
 
         // ============================================================
-        // 3. PAMĆENJE ZADNJEG VIĐENJA (localStorage)
+        // 3. TRAJNO PAMĆENJE - SVI AUTOBUSI
         // ============================================================
-        var LAST_SEEN_KEY = 'busLastSeen';
+        var LAST_SEEN_KEY = 'busLastSeen_v3';
 
         function loadLastSeen() {
             try {
                 var data = localStorage.getItem(LAST_SEEN_KEY);
-                if (data) return JSON.parse(data);
-            } catch (e) {}
+                if (data) {
+                    var parsed = JSON.parse(data);
+                    if (typeof parsed === 'object' && parsed !== null) {
+                        return parsed;
+                    }
+                }
+            } catch (e) {
+                console.warn('Greška pri učitavanju lastSeen:', e);
+            }
             return {};
         }
 
         function saveLastSeen(lastSeen) {
             try {
                 localStorage.setItem(LAST_SEEN_KEY, JSON.stringify(lastSeen));
-            } catch (e) {}
+            } catch (e) {
+                console.warn('Greška pri spremanju lastSeen:', e);
+            }
         }
 
         var lastSeen = loadLastSeen();
+
+        // Inicijaliziraj lastSeen za SVE autobuse (ako već nemaju zapis)
+        allGbrs.forEach(gbr => {
+            if (!lastSeen[gbr]) {
+                lastSeen[gbr] = null; // null znači "nikad viđen"
+            }
+        });
+        saveLastSeen(lastSeen);
 
         // ============================================================
         // 4. IKONE
@@ -587,7 +599,13 @@
 
             var v = vehicleData[gbr] || {};
             var last = lastSeen[gbr] ? new Date(lastSeen[gbr]) : null;
-            var lastStr = last ? last.toLocaleString('hr-HR') : 'Nikad';
+            var lastStr = last ? last.toLocaleString('hr-HR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }) : 'Nikad';
 
             var html = `<div style="font-family:Arial,sans-serif;min-width:200px;padding:4px 0;">
                 <div style="color:#ff6600;font-weight:700;font-size:16px;margin-bottom:6px;">🚌 Linija ${line}</div>
@@ -600,8 +618,9 @@
                 <div style="padding:3px 0;font-size:13px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;">
                     <span style="color:#666;">Model:</span><span style="color:#1a1a2e;font-weight:600;">${v.model || 'Nepoznato'}</span>
                 </div>
-                <div style="padding:3px 0;font-size:13px;display:flex;justify-content:space-between;">
-                    <span style="color:#666;">Zadnji put viđen:</span><span style="color:#1a1a2e;font-weight:600;">${lastStr}</span>
+                <div style="padding:3px 0;font-size:13px;display:flex;justify-content:space-between;border-top:2px solid #ff6600;margin-top:4px;padding-top:6px;">
+                    <span style="color:#666;">Zadnji put viđen:</span>
+                    <span style="color:#1a1a2e;font-weight:600;">${lastStr}</span>
                 </div>
             </div>`;
             m.bindPopup(html).openPopup();
@@ -655,11 +674,17 @@
 
             allGbrs.forEach(gbr => {
                 var last = lastSeen[gbr] ? new Date(lastSeen[gbr]) : null;
-                var lastStr = last ? last.toLocaleString('hr-HR') : 'Nikad';
+                var lastStr = last ? last.toLocaleString('hr-HR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }) : 'Nikad';
+
                 var isActive = markers[gbr] ? true : false;
                 var line = markers[gbr] ? (markers[gbr].busData?.name || '') : '';
 
-                // Status: da li je viđen u zadnjih 7 dana?
                 var statusClass = 'never';
                 var statusText = '❌ nikad';
                 if (last) {
@@ -691,7 +716,7 @@
         }
 
         // ============================================================
-        // 8. DOHVATI LIVE AUTOBUSE
+        // 8. DOHVATI LIVE AUTOBUSE - PAMTI LINIJU I VRIJEME
         // ============================================================
         async function fetchLiveBuses() {
             try {
@@ -700,17 +725,18 @@
                 var vehicles = data.vehicles;
                 var currentGbrs = vehicles.map(v => v.garageNumber);
 
-                // Ažuriraj lastSeen za sve viđene autobuse
+                // Ažuriraj lastSeen za SVE autobuse koje API vrati
+                var now = new Date().toISOString();
                 vehicles.forEach(bus => {
                     var gbr = bus.garageNumber;
-                    var now = new Date().toISOString();
+                    // Spremi trenutno vrijeme kao zadnje viđenje
                     lastSeen[gbr] = now;
                 });
 
-                // Spremi u localStorage
+                // Spremi u localStorage (trajno)
                 saveLastSeen(lastSeen);
 
-                // Ažuriraj markere
+                // Ažuriraj markere na karti
                 vehicles.forEach(bus => {
                     var gbr = bus.garageNumber;
                     var line = bus.name;
@@ -730,7 +756,8 @@
                     }
                 });
 
-                // Ukloni markere za autobuse koji više nisu u prometu (ali zadrži lastSeen)
+                // Ukloni markere za autobuse koji više nisu u prometu
+                // (ZADRŽI lastSeen podatke!)
                 for (var gbr in markers) {
                     if (!currentGbrs.includes(String(gbr))) {
                         map.removeLayer(markers[gbr]);
@@ -744,7 +771,7 @@
 
                 if (document.getElementById('panel').classList.contains('visible')) renderPanel();
             } catch (e) {
-                console.error(e);
+                console.error('Greška pri dohvaćanju:', e);
                 document.getElementById('statsText').innerHTML = 'Greška';
             }
         }
@@ -784,6 +811,9 @@
         loadStops();
         fetchLiveBuses();
         setInterval(fetchLiveBuses, 7000);
+
+        console.log('📊 Praćenje autobusa - sprema se zadnje viđenje za SVE autobuse');
+        console.log('📝 Zadnje viđenje:', lastSeen);
     </script>
 </body>
 </html>
