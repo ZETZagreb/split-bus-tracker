@@ -313,7 +313,7 @@
         <span class="badge" id="busCount">0</span>
     </div>
 
-    <button class="btn-list" onclick="togglePanel()">📋 <span>Popis</span></button>
+    <button class="btn-list" onclick="togglePanel()">📋 <span>Popis svih vozila</span></button>
 
     <div class="btn-stops">
         <button id="stopsBtn">📍 Prikaži stanice</button>
@@ -589,7 +589,7 @@
         }
 
         // ============================================================
-        // 5. KLIK NA AUTOBUS
+        // 5. KLIK NA AUTOBUS - SAMO LINIJA, GBR, REG, MODEL (BEZ ZADNJEG VIĐENJA)
         // ============================================================
         function onBusClick(e) {
             var m = e.target;
@@ -598,14 +598,6 @@
             if (!gbr || !line) return;
 
             var v = vehicleData[gbr] || {};
-            var last = lastSeen[gbr] ? new Date(lastSeen[gbr]) : null;
-            var lastStr = last ? last.toLocaleString('hr-HR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            }) : 'Nikad';
 
             var html = `<div style="font-family:Arial,sans-serif;min-width:200px;padding:4px 0;">
                 <div style="color:#ff6600;font-weight:700;font-size:16px;margin-bottom:6px;">🚌 Linija ${line}</div>
@@ -617,10 +609,6 @@
                 </div>
                 <div style="padding:3px 0;font-size:13px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;">
                     <span style="color:#666;">Model:</span><span style="color:#1a1a2e;font-weight:600;">${v.model || 'Nepoznato'}</span>
-                </div>
-                <div style="padding:3px 0;font-size:13px;display:flex;justify-content:space-between;border-top:2px solid #ff6600;margin-top:4px;padding-top:6px;">
-                    <span style="color:#666;">Zadnji put viđen:</span>
-                    <span style="color:#1a1a2e;font-weight:600;">${lastStr}</span>
                 </div>
             </div>`;
             m.bindPopup(html).openPopup();
