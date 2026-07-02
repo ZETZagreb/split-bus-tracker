@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Promet Split - Live Autobusi</title>
+    <title>Promet Split - Live Autobusi sa smjerom</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -106,6 +106,16 @@
             font-size: 11px;
         }
 
+        /* NOVA IKONA SA STRELICOM */
+        .bus-container {
+            position: relative;
+            width: 56px;
+            height: 44px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
         .bus-label {
             width: 50px;
             height: 36px;
@@ -117,6 +127,7 @@
             display: flex;
             flex-direction: column;
             cursor: pointer;
+            position: relative;
         }
         .bus-label-red {
             width: 50px;
@@ -129,6 +140,7 @@
             display: flex;
             flex-direction: column;
             cursor: pointer;
+            position: relative;
         }
         .bus-top {
             background: white;
@@ -158,6 +170,24 @@
             font-size: 11px;
             text-align: center;
             text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
+        }
+
+        /* STRELICA IZNAD AUTOBUSA */
+        .arrow-indicator {
+            font-size: 18px;
+            line-height: 18px;
+            height: 18px;
+            color: #ff6600;
+            text-shadow: 0 0 6px rgba(255, 102, 0, 0.8);
+            transition: transform 0.3s ease;
+            text-align: center;
+            display: block;
+            width: 100%;
+            margin-bottom: -4px;
+        }
+        .arrow-indicator.red {
+            color: #ff0000;
+            text-shadow: 0 0 6px rgba(255, 0, 0, 0.8);
         }
 
         .panel {
@@ -300,6 +330,15 @@
                 height: 16px;
                 line-height: 16px;
                 font-size: 10px;
+            }
+            .arrow-indicator {
+                font-size: 14px;
+                line-height: 14px;
+                height: 14px;
+            }
+            .bus-container {
+                width: 48px;
+                height: 38px;
             }
         }
     </style>
@@ -535,6 +574,7 @@
         }).addTo(map);
 
         var markers = {};
+        var prevPositions = {}; // Za praćenje smjera
         var allStops = [];
         var stopMarkers = [];
         var stopsVisible = false;
@@ -561,23 +601,64 @@
         var lastSeen = loadLastSeen();
 
         // ============================================================
-        // 4. IKONE
+        // 4. IKONE SA STRELICOM ZA SMIJER
         // ============================================================
-        function createIcon(lineName, garageNumber) {
+        function getArrow(angle) {
+            // angle u radijanima, pretvaramo u stupnjeve za CSS transform
+            var deg = angle * (180 / Math.PI);
+            // Normaliziramo da bude između 0 i 360
+            deg = ((deg % 360) + 360) % 360;
+
+            // Odabiremo strelicu prema kutu
+            var arrow = '▲';
+            if (deg >= 22.5 && deg < 67.5) arrow = '◤';
+            else if (deg >= 67.5 && deg < 112.5) arrow = '►';
+            else if (deg >= 112.5 && deg < 157.5) arrow = '◥';
+            else if (deg >= 157.5 && deg < 202.5) arrow = '▼';
+            else if (deg >= 202.5 && deg < 247.5) arrow = '◣';
+            else if (deg >= 247.5 && deg < 292.5) arrow = '◄';
+            else if (deg >= 292.5 && deg < 337.5) arrow = '◢';
+            else arrow = '▲';
+
+            return arrow;
+        }
+
+        function createIconWithArrow(lineName, garageNumber, angle) {
             var isSpecial = (garageNumber == '307' || garageNumber == '308');
-            var html = isSpecial ?
-                `<div class="bus-label-red"><div class="bus-top">${lineName}</div><div class="bus-bottom-red">${garageNumber}</div></div>` :
-                `<div class="bus-label"><div class="bus-top">${lineName}</div><div class="bus-bottom">${garageNumber}</div></div>`;
+            var arrow = getArrow(angle);
+            var arrowClass = isSpecial ? 'arrow-indicator red' : 'arrow-indicator';
+
+            var html = `
+                <div class="bus-container">
+                    <div class="${arrowClass}" style="transform: rotate(${angle * (180 / Math.PI)}deg);">${arrow}</div>
+                    <div class="${isSpecial ? 'bus-label-red' : 'bus-label'}">
+                        <div class="bus-top">${lineName}</div>
+                        <div class="${isSpecial ? 'bus-bottom-red' : 'bus-bottom'}">${garageNumber}</div>
+                    </div>
+                </div>
+            `;
+
             return L.divIcon({
                 html: html,
                 className: '',
-                iconSize: [50, 36],
-                iconAnchor: [25, 18]
+                iconSize: [56, 44],
+                iconAnchor: [28, 22]
             });
         }
 
         // ============================================================
-        // 5. KLIK NA AUTOBUS
+        // 5. IZRAČUNAJ SMIJER
+        // ============================================================
+        function calculateAngle(lat1, lng1, lat2, lng2) {
+            if (!lat1 || !lng1 || !lat2 || !lng2) return 0;
+            var dLng = lng2 - lng1;
+            var y = Math.sin(dLng) * Math.cos(lat2);
+            var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+            return Math.atan2(y, x);
+        }
+
+        // ============================================================
+        // 6. KLIK NA AUTOBUS
         // ============================================================
         function onBusClick(e) {
             var m = e.target;
@@ -608,7 +689,7 @@
         }
 
         // ============================================================
-        // 6. STANICE
+        // 7. STANICE
         // ============================================================
         function loadStops() {
             fetch('stops.json')
@@ -646,7 +727,7 @@
         }
 
         // ============================================================
-        // 7. PANEL POPIS - SVI AUTOBUSI SA ZADNJIM VIĐENJEM
+        // 8. PANEL POPIS
         // ============================================================
         function renderPanel() {
             var el = document.getElementById('panelList');
@@ -659,7 +740,6 @@
                 var isActive = markers[gbr] ? true : false;
                 var line = markers[gbr] ? (markers[gbr].busData?.name || '') : '';
 
-                // Status: da li je viđen u zadnjih 7 dana?
                 var statusClass = 'never';
                 var statusText = '❌ nikad';
                 if (last) {
@@ -691,7 +771,7 @@
         }
 
         // ============================================================
-        // 8. DOHVATI LIVE AUTOBUSE
+        // 9. DOHVATI LIVE AUTOBUSE
         // ============================================================
         async function fetchLiveBuses() {
             try {
@@ -707,20 +787,29 @@
                     lastSeen[gbr] = now;
                 });
 
-                // Spremi u localStorage
                 saveLastSeen(lastSeen);
 
-                // Ažuriraj markere
+                // Ažuriraj markere sa smjerom
                 vehicles.forEach(bus => {
                     var gbr = bus.garageNumber;
                     var line = bus.name;
                     var lat = bus.latitude;
                     var lng = bus.longitude;
 
-                    var icon = createIcon(line, gbr);
+                    // Izračunaj smjer ako imamo prethodnu poziciju
+                    var angle = 0;
+                    if (prevPositions[gbr]) {
+                        var prev = prevPositions[gbr];
+                        angle = calculateAngle(prev.lat, prev.lng, lat, lng);
+                    }
+                    // Spremi trenutnu poziciju za sljedeći put
+                    prevPositions[gbr] = { lat: lat, lng: lng };
+
+                    var icon = createIconWithArrow(line, gbr, angle);
+
                     if (markers[gbr]) {
                         markers[gbr].setLatLng([lat, lng]);
-                        markers[gbr].setIcon(createIcon(line, gbr));
+                        markers[gbr].setIcon(icon);
                         markers[gbr].busData = { name: line, garageNumber: gbr };
                     } else {
                         var marker = L.marker([lat, lng], { icon: icon }).addTo(map);
@@ -730,11 +819,12 @@
                     }
                 });
 
-                // Ukloni markere za autobuse koji više nisu u prometu (ali zadrži lastSeen)
+                // Ukloni markere za autobuse koji više nisu u prometu
                 for (var gbr in markers) {
                     if (!currentGbrs.includes(String(gbr))) {
                         map.removeLayer(markers[gbr]);
                         delete markers[gbr];
+                        delete prevPositions[gbr];
                     }
                 }
 
@@ -750,7 +840,7 @@
         }
 
         // ============================================================
-        // 9. PRETRAGA
+        // 10. PRETRAGA
         // ============================================================
         function searchBuses() {
             var val = document.getElementById('searchInput').value.toLowerCase().trim();
@@ -768,7 +858,7 @@
         }
 
         // ============================================================
-        // 10. POKRENI
+        // 11. POKRENI
         // ============================================================
         document.getElementById('stopsBtn').onclick = toggleStops;
         document.getElementById('searchInput').addEventListener('input', searchBuses);
@@ -783,7 +873,7 @@
 
         loadStops();
         fetchLiveBuses();
-        setInterval(fetchLiveBuses, 7000);
+        setInterval(fetchLiveBuses, 5000);
     </script>
 </body>
 </html>
