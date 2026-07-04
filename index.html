@@ -535,9 +535,9 @@
         var stopsVisible = false;
 
         // ============================================================
-        // 3. TRAJNO PAMĆENJE - SVI AUTOBUSI
+        // 3. TRAJNO PAMĆENJE - NIKAD NE BRIŠEMO!
         // ============================================================
-        var LAST_SEEN_KEY = 'busLastSeen_v3';
+        var LAST_SEEN_KEY = 'busLastSeen_v4';
 
         function loadLastSeen() {
             try {
@@ -562,12 +562,17 @@
             }
         }
 
+        // Učitaj postojeće podatke (ako ih nema, kreiraj prazan objekt)
         var lastSeen = loadLastSeen();
 
         // Inicijaliziraj lastSeen za SVE autobuse (ako već nemaju zapis)
+        // ALI NEMOJ BRIŠATI POSTOJEĆE PODATKE!
         allGbrs.forEach(gbr => {
             if (!lastSeen[gbr]) {
-                lastSeen[gbr] = null; // null znači "nikad viđen"
+                lastSeen[gbr] = {
+                    lastSeen: null, // null znači "nikad viđen"
+                    lastLine: null // zadnja linija kojom je vozio
+                };
             }
         });
         saveLastSeen(lastSeen);
@@ -589,7 +594,7 @@
         }
 
         // ============================================================
-        // 5. KLIK NA AUTOBUS - SAMO LINIJA, GBR, REG, MODEL (BEZ ZADNJEG VIĐENJA)
+        // 5. KLIK NA AUTOBUS - SAMO LINIJA, GBR, REG, MODEL
         // ============================================================
         function onBusClick(e) {
             var m = e.target;
@@ -661,7 +666,10 @@
             var html = '';
 
             allGbrs.forEach(gbr => {
-                var last = lastSeen[gbr] ? new Date(lastSeen[gbr]) : null;
+                var data = lastSeen[gbr] || {};
+                var last = data.lastSeen ? new Date(data.lastSeen) : null;
+                var lastLine = data.lastLine || '';
+
                 var lastStr = last ? last.toLocaleString('hr-HR', {
                     day: '2-digit',
                     month: '2-digit',
@@ -671,15 +679,18 @@
                 }) : 'Nikad';
 
                 var isActive = markers[gbr] ? true : false;
-                var line = markers[gbr] ? (markers[gbr].busData?.name || '') : '';
+                var line = markers[gbr] ? (markers[gbr].busData?.name || '') : lastLine;
 
                 var statusClass = 'never';
                 var statusText = '❌ nikad';
                 if (last) {
                     var diffDays = (now - last) / (1000 * 60 * 60 * 24);
-                    if (diffDays <= 7) {
+                    if (diffDays <= 1) {
                         statusClass = 'ok';
                         statusText = '✅ aktivan';
+                    } else if (diffDays <= 7) {
+                        statusClass = 'ok';
+                        statusText = '✅ vozio prije ' + Math.round(diffDays) + ' dana';
                     } else {
                         statusClass = 'old';
                         statusText = '⛔ nije vozio od ' + last.toLocaleDateString('hr-HR');
@@ -704,7 +715,7 @@
         }
 
         // ============================================================
-        // 8. DOHVATI LIVE AUTOBUSE - PAMTI LINIJU I VRIJEME
+        // 8. DOHVATI LIVE AUTOBUSE - TRAJNO PAMTI LINIJU I VRIJEME
         // ============================================================
         async function fetchLiveBuses() {
             try {
@@ -717,8 +728,14 @@
                 var now = new Date().toISOString();
                 vehicles.forEach(bus => {
                     var gbr = bus.garageNumber;
-                    // Spremi trenutno vrijeme kao zadnje viđenje
-                    lastSeen[gbr] = now;
+                    var line = bus.name;
+                    
+                    // Spremi liniju i vrijeme
+                    if (!lastSeen[gbr]) {
+                        lastSeen[gbr] = {};
+                    }
+                    lastSeen[gbr].lastSeen = now;
+                    lastSeen[gbr].lastLine = line;
                 });
 
                 // Spremi u localStorage (trajno)
@@ -800,7 +817,7 @@
         fetchLiveBuses();
         setInterval(fetchLiveBuses, 7000);
 
-        console.log('📊 Praćenje autobusa - sprema se zadnje viđenje za SVE autobuse');
+        console.log('📊 TRAJNO PAMĆENJE - podaci se NIKAD ne brišu!');
         console.log('📝 Zadnje viđenje:', lastSeen);
     </script>
 </body>
